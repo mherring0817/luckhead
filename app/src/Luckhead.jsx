@@ -2056,7 +2056,7 @@ const tierIdx = (p) => TIERS.reduce((t, x, i) => (p >= x.min ? i : t), 0);
 const MUSIC_BUS_VOL = 0.30;   // whole-music level into the speakers
 const MUSIC_MAIN_VOL = 0.55;  // main theme within the music bus
 const MUSIC_TENSE_VOL = 0.6;  // tense layer at full tilt
-const MUSIC_FADE_IN = 2.5;    // seconds for trouble to kick in
+const MUSIC_FADE_IN = 5;      // seconds for trouble to swell in
 const MUSIC_FADE_OUT = 8;     // seconds for trouble to drain away
 // Loop geometry, measured from the masters to the sample. The exports carry a
 // hair of silence at each end and the mp3 frames add padding of their own, so
@@ -2185,7 +2185,7 @@ function makeAudio() {
   // slowly once it is not. Mute and game-over ride a shared bus gain.
   let musicMuted = false, musicOver = false, musicStarted = false;
   let onMusicFail = null;
-  let musicBus = null, tenseGain = null, tenseOn = false;
+  let musicBus = null, mainGain = null, tenseGain = null, tenseOn = false;
   let bufSources = [], streamEls = [], curSetIdx = -1;
   const stopAllMusic = () => {
     bufSources.forEach((s) => { try { s.stop(); } catch (e) {} try { s.disconnect(); } catch (e) {} });
@@ -2193,7 +2193,7 @@ function makeAudio() {
     streamEls.forEach((el) => { try { el.pause(); } catch (e) {} el.src = ""; });
     streamEls = [];
     if (musicBus) { try { musicBus.disconnect(); } catch (e) {} musicBus = null; }
-    tenseGain = null;
+    mainGain = null; tenseGain = null;
   };
 
   const grab = (c, url) => {
@@ -2221,13 +2221,12 @@ function makeAudio() {
     musicBus = c.createGain();
     musicBus.gain.value = musicTarget();
     musicBus.connect(c.destination);
-    const mainGain = c.createGain();
-    mainGain.gain.value = MUSIC_MAIN_VOL;
+    mainGain = c.createGain();
+    mainGain.gain.value = tenseOn ? 0.0001 : MUSIC_MAIN_VOL;
     mainGain.connect(musicBus);
     tenseGain = c.createGain();
     tenseGain.gain.value = tenseOn ? MUSIC_TENSE_VOL : 0.0001;
     tenseGain.connect(musicBus);
-    return mainGain;
   };
 
   // Preferred path. Whole files decoded into memory, looped by the audio clock,
@@ -2235,7 +2234,7 @@ function makeAudio() {
   const startBuffered = (c, set) =>
     Promise.all([grab(c, MUSIC_BASE + set.main), grab(c, MUSIC_BASE + set.tense)])
       .then(([mainBuf, tenseBuf]) => {
-        const mainGain = buildBus(c);
+        buildBus(c);
         // Decoders that honour the LAME tag hand back the true length; those
         // that do not leave the encoder delay parked at the head. The clamp
         // measures which case this browser is and shifts the window to match.
@@ -2278,7 +2277,7 @@ function makeAudio() {
       if (settled) return;
       if (mainEl.readyState < 3 || tenseEl.readyState < 3) return;
       settled = true;
-      const mainGain = buildBus(c);
+      buildBus(c);
       try {
         c.createMediaElementSource(mainEl).connect(mainGain);
         c.createMediaElementSource(tenseEl).connect(tenseGain);
@@ -2316,12 +2315,17 @@ function makeAudio() {
 
   const setTense = (on) => {
     tenseOn = !!on;
-    if (!tenseGain || !ctx) return;
-    const g = tenseGain.gain, t = ctx.currentTime;
-    g.cancelScheduledValues(t);
-    g.setValueAtTime(Math.max(0.0001, g.value), t);
-    g.linearRampToValueAtTime(on ? MUSIC_TENSE_VOL : 0.0001,
-      t + (on ? MUSIC_FADE_IN : MUSIC_FADE_OUT));
+    if (!tenseGain || !mainGain || !ctx) return;
+    const t = ctx.currentTime, dur = on ? MUSIC_FADE_IN : MUSIC_FADE_OUT;
+    const ramp = (param, to) => {
+      param.cancelScheduledValues(t);
+      param.setValueAtTime(Math.max(0.0001, param.value), t);
+      param.linearRampToValueAtTime(to, t + dur);
+    };
+    // Cross-fade: as the tense track rises the main theme falls away to silence,
+    // so only one is ever really heard. Clearing trouble brings the theme back.
+    ramp(tenseGain.gain, on ? MUSIC_TENSE_VOL : 0.0001);
+    ramp(mainGain.gain, on ? 0.0001 : MUSIC_MAIN_VOL);
   };
 
   return {
