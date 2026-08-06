@@ -923,7 +923,7 @@ function freshState(seed, diff) {
   });
 
   const DF = diff || DEFAULT_DIFF;
-  return { grid, terrain, seed: useSeed, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
+  return { grid, terrain, seed: useSeed, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: Math.floor(Math.random() * MUSIC_SETS.length), invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
 }
 
 const rc = (i) => [Math.floor(i / SIZE), i % SIZE];
@@ -1999,6 +1999,7 @@ function step(prev) {
       challengerCtx(pop, d, hap, { crime, ties, rigged: prev.rigged, testified: prev.testified }));
   }
   let over = prev.over, elected = prev.elected, succession = prev.succession || 0;
+  let musicSet = prev.musicSet === undefined ? 0 : prev.musicSet;
   let broke = prev.broke || false;
   if (fed === 2) over = true;
   let lastElection = prev.lastElection, electionSeen = prev.electionSeen || 0;
@@ -2012,7 +2013,8 @@ function step(prev) {
     electionSeen += 1;
     note(won ? "🗳️" : "🧳", won ? "RE-ELECTED" : "VOTED OUT",
       `${youPct}% of the vote against ${challenger ? challenger.name : "the field"}.`, won ? "good" : "bad");
-    if (won) { elected += 1; if (elected % SUCCESSION_EVERY === 0) succession = 1; challenger = null; campaign = 0; }
+    if (won) { elected += 1; if (elected % SUCCESSION_EVERY === 0) succession = 1; challenger = null; campaign = 0;
+      musicSet = pickMusicSet(prev.musicSet); }
     else over = true;
   }
 
@@ -2038,7 +2040,7 @@ function step(prev) {
   const money = prev.money + net;
   if (money <= DEBT_FLOOR) { over = true; broke = true; }
   const log = newEntries.length ? [...(prev.log || []), ...newEntries].slice(-LOG_KEEP) : (prev.log || []);
-  return { ...prev, log, logSeq, env, speech, promise, promiseDay, promiseSeq, promiseBroken, promiseKept, pop, money, broke, day, mafia, crime, calm, approval, over, elected, ledger, polled, lossWarned, unlocked, chief, smuggleOffer, venueDay, venueOffer, fed, heat, ties, reprisal, dayUnlocked, succession, tsuiReturn, event, eventEnds, eventSeen, nextEvent, challenger, lastElection, electionSeen, theatreDay, bust, pvisit, faithMeet, campaign, loanOffer, tsuiWar, chiefHit, chiefKilled, deadChiefs, vacancyReason, pendingMonument, chiefId, backroom, justBroke: false, ice, iceUntil, graffiti, graffitiUntil, graffitiSeen, billboardDay, riot, riotUntil, riotSeen, prisonDay, viral, viralSeen, viralAck, hideawayFirstDay, blackmail, blackmailSeen, blackmailUntil: prev.blackmailUntil || 0, arsonDay, arsonCount, lastArson, arsonAck, indictWarn, protest, protestUntil, moodLowDays, protestsSeen, strike, strikeUntil, strikeCool, strikesSeen, schoolDemand, cop, copUntil, copCool, doctrine, doctrineCool, lowWarn, envWarn, homelessWarn, shooting, shootingUntil, shootingDead, shootingsSeen, invest, investCool, river, riverUntil, riverCool, riversSeen, pothole, potholeCool, potholeTile, potholesSeen, press,
+  return { ...prev, musicSet, log, logSeq, env, speech, promise, promiseDay, promiseSeq, promiseBroken, promiseKept, pop, money, broke, day, mafia, crime, calm, approval, over, elected, ledger, polled, lossWarned, unlocked, chief, smuggleOffer, venueDay, venueOffer, fed, heat, ties, reprisal, dayUnlocked, succession, tsuiReturn, event, eventEnds, eventSeen, nextEvent, challenger, lastElection, electionSeen, theatreDay, bust, pvisit, faithMeet, campaign, loanOffer, tsuiWar, chiefHit, chiefKilled, deadChiefs, vacancyReason, pendingMonument, chiefId, backroom, justBroke: false, ice, iceUntil, graffiti, graffitiUntil, graffitiSeen, billboardDay, riot, riotUntil, riotSeen, prisonDay, viral, viralSeen, viralAck, hideawayFirstDay, blackmail, blackmailSeen, blackmailUntil: prev.blackmailUntil || 0, arsonDay, arsonCount, lastArson, arsonAck, indictWarn, protest, protestUntil, moodLowDays, protestsSeen, strike, strikeUntil, strikeCool, strikesSeen, schoolDemand, cop, copUntil, copCool, doctrine, doctrineCool, lowWarn, envWarn, homelessWarn, shooting, shootingUntil, shootingDead, shootingsSeen, invest, investCool, river, riverUntil, riverCool, riversSeen, pothole, potholeCool, potholeTile, potholesSeen, press,
     peakPop: Math.max(prev.peakPop || 0, pop), graft: (prev.graft || 0) + (mafiaMoney > 0 ? mafiaMoney : 0) };
 }
 
@@ -2070,15 +2072,24 @@ const MUSIC_ENC_DELAY = 0.030952;   // LAME lead-in, if this decoder leaves it
 const MUSIC_ENC_PAD = 0.030952;     // LAME tail padding, likewise
 // Per-set loop geometry, each measured from its own masters. trueLen is the
 // gapless decoded length; loopStart is the first audible sample shared by both
-// stems; loopLen is the window they both loop on.
+// stems; loopLen is the window they both loop on. A term picks one of these at
+// random on each win, never the one it just played, so the score keeps turning
+// over indefinitely without a set ever following itself.
 const MUSIC_SETS = [
-  { main: "main.mp3",        tense: "tense.mp3",        trueLen: 45.244082, loopStart: 0.008118, loopLen: 45.210249 },
-  { main: "main2.mp3",       tense: "tense2.mp3",       trueLen: 54.909388, loopStart: 0.024059, loopLen: 54.875397 },
+  { main: "main.mp3",  tense: "tense.mp3",  trueLen: 45.244082, loopStart: 0.008118, loopLen: 45.210249 },
+  { main: "main2.mp3", tense: "tense2.mp3", trueLen: 54.909388, loopStart: 0.024059, loopLen: 54.875397 },
+  { main: "main3.mp3", tense: "tense3.mp3", trueLen: 45.244082, loopStart: 0.035601, loopLen: 45.186349 },
+  { main: "main4.mp3", tense: "tense4.mp3", trueLen: 52.427755, loopStart: 0.007075, loopLen: 52.396236 },
 ];
-// Which set a given number of terms-won maps to. Wraps, so term 5 reuses set 1.
-// Sets beyond what MUSIC_SETS defines fall back by modulo, so the game never
-// asks for a file that isn't there even before all four terms are composed.
-const musicSetFor = (termsWon) => MUSIC_SETS[(termsWon || 0) % MUSIC_SETS.length];
+// Pick a set index other than the one now playing. With four sets this draws
+// evenly from the other three; the guard also covers the degenerate one-set
+// case so it can never loop forever looking for an alternative.
+const pickMusicSet = (avoid) => {
+  if (MUSIC_SETS.length <= 1) return 0;
+  let n = Math.floor(Math.random() * MUSIC_SETS.length);
+  if (n === avoid) n = (n + 1 + Math.floor(Math.random() * (MUSIC_SETS.length - 1))) % MUSIC_SETS.length;
+  return n;
+};
 function makeAudio() {
   let ctx = null, master = null;
   let muted = false;
@@ -2484,16 +2495,15 @@ export default function Luckhead() {
   useEffect(() => {
     if (audioReady && audio.current) {
       audio.current.onMusicFail((why) => setMusicDead(why || "unknown"));
-      audio.current.startMusic((st.elected || 0) % 4);
+      audio.current.startMusic(st.musicSet || 0);
     }
   }, [audioReady]);
 
-  // New term, new theme. The set index follows terms won and wraps every four,
-  // so a fifth term reuses the first set. startMusic ignores a repeat index, so
-  // this only ever fires a real switch.
+  // New term, new theme. The set is chosen on each win and stored in state;
+  // startMusic ignores a repeat index, so this only ever fires a real switch.
   useEffect(() => {
-    if (audioReady && audio.current) audio.current.startMusic((st.elected || 0) % 4);
-  }, [st.elected, audioReady]);
+    if (audioReady && audio.current) audio.current.startMusic(st.musicSet || 0);
+  }, [st.musicSet, audioReady]);
 
   // The tense layer rises when any of these is true and drains once all clear:
   // crime past 50, approval under 50, or an election ten days out or closer.
