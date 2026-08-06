@@ -2060,17 +2060,25 @@ const MUSIC_FADE_OUT = 8;     // seconds for trouble to drain away
 // hair of silence at each end and the mp3 frames add padding of their own, so
 // the loop runs on this window instead of the file bounds: the wrap lands on
 // music, not dead air.
-const MUSIC_TRUE_LEN = 45.244082;   // gapless decoded length of both loops
-const MUSIC_LOOP_START = 0.008118;  // first audible sample across both stems
-const MUSIC_LOOP_LEN = 45.210249;   // shared window length for both layers
+// The loops live on a CDN rather than inside this file: stereo tracks as base64
+// came to four fifths of the source. Each term gets its own pair, main plus
+// tense, and the pair swaps every time the mayor wins re-election, cycling back
+// to the first after four. If any fetch fails the game runs on in silence and
+// says so on the chip.
+const MUSIC_BASE = "https://cdn.jsdelivr.net/gh/mherring0817/luckheadaudio@main/";
 const MUSIC_ENC_DELAY = 0.030952;   // LAME lead-in, if this decoder leaves it
 const MUSIC_ENC_PAD = 0.030952;     // LAME tail padding, likewise
-// The loops live on a CDN rather than inside this file: two 45-second stereo
-// tracks as base64 came to four fifths of the source. If the fetch fails, for
-// any reason at all, the game carries on in silence and says so on the chip.
-const MUSIC_BASE = "https://cdn.jsdelivr.net/gh/mherring0817/luckheadaudio@main/";
-const MUSIC_MAIN_URL = MUSIC_BASE + "main.mp3";
-const MUSIC_TENSE_URL = MUSIC_BASE + "tense.mp3";
+// Per-set loop geometry, each measured from its own masters. trueLen is the
+// gapless decoded length; loopStart is the first audible sample shared by both
+// stems; loopLen is the window they both loop on.
+const MUSIC_SETS = [
+  { main: "main.mp3",        tense: "tense.mp3",        trueLen: 45.244082, loopStart: 0.008118, loopLen: 45.210249 },
+  { main: "main2.mp3",       tense: "tense2.mp3",       trueLen: 54.909388, loopStart: 0.024059, loopLen: 54.875397 },
+];
+// Which set a given number of terms-won maps to. Wraps, so term 5 reuses set 1.
+// Sets beyond what MUSIC_SETS defines fall back by modulo, so the game never
+// asks for a file that isn't there even before all four terms are composed.
+const musicSetFor = (termsWon) => MUSIC_SETS[(termsWon || 0) % MUSIC_SETS.length];
 function makeAudio() {
   let ctx = null, master = null;
   let muted = false;
@@ -2167,6 +2175,15 @@ function makeAudio() {
   let musicMuted = false, musicOver = false, musicStarted = false;
   let onMusicFail = null;
   let musicBus = null, tenseGain = null, tenseOn = false;
+  let bufSources = [], streamEls = [], curSetIdx = -1;
+  const stopAllMusic = () => {
+    bufSources.forEach((s) => { try { s.stop(); } catch (e) {} try { s.disconnect(); } catch (e) {} });
+    bufSources = [];
+    streamEls.forEach((el) => { try { el.pause(); } catch (e) {} el.src = ""; });
+    streamEls = [];
+    if (musicBus) { try { musicBus.disconnect(); } catch (e) {} musicBus = null; }
+    tenseGain = null;
+  };
 
   const grab = (c, url) => {
     const tail = url.slice(url.lastIndexOf("/") + 1);
@@ -2204,8 +2221,8 @@ function makeAudio() {
 
   // Preferred path. Whole files decoded into memory, looped by the audio clock,
   // so the two layers are locked to the sample and the seam is exact.
-  const startBuffered = (c) =>
-    Promise.all([grab(c, MUSIC_MAIN_URL), grab(c, MUSIC_TENSE_URL)])
+  const startBuffered = (c, set) =>
+    Promise.all([grab(c, MUSIC_BASE + set.main), grab(c, MUSIC_BASE + set.tense)])
       .then(([mainBuf, tenseBuf]) => {
         const mainGain = buildBus(c);
         // Decoders that honour the LAME tag hand back the true length; those
@@ -2214,15 +2231,16 @@ function makeAudio() {
         const t0 = c.currentTime + 0.08;
         [[mainBuf, mainGain], [tenseBuf, tenseGain]].forEach(([buf, g]) => {
           const headJunk = Math.min(MUSIC_ENC_DELAY,
-            Math.max(0, buf.duration - MUSIC_TRUE_LEN - MUSIC_ENC_PAD));
-          const ls = headJunk + MUSIC_LOOP_START;
+            Math.max(0, buf.duration - set.trueLen - MUSIC_ENC_PAD));
+          const ls = headJunk + set.loopStart;
           const srcNode = c.createBufferSource();
           srcNode.buffer = buf;
           srcNode.loop = true;
           srcNode.loopStart = ls;
-          srcNode.loopEnd = Math.min(buf.duration, ls + MUSIC_LOOP_LEN);
+          srcNode.loopEnd = Math.min(buf.duration, ls + set.loopLen);
           srcNode.connect(g);
           srcNode.start(t0, ls);
+          bufSources.push(srcNode);
         });
       });
 
@@ -2230,7 +2248,7 @@ function makeAudio() {
   // they block fetch. Two elements cannot be clock-locked the way buffers can,
   // so the tense layer is nudged back into line only while it is silent: any
   // correction is inaudible because there is nothing to hear yet.
-  const startStreamed = (c) => new Promise((res, rej) => {
+  const startStreamed = (c, set) => new Promise((res, rej) => {
     const mk = (url) => {
       const el = new Audio();
       el.crossOrigin = "anonymous"; // without this the graph reads as silence
@@ -2239,7 +2257,8 @@ function makeAudio() {
       el.src = url;
       return el;
     };
-    const mainEl = mk(MUSIC_MAIN_URL), tenseEl = mk(MUSIC_TENSE_URL);
+    const mainEl = mk(MUSIC_BASE + set.main), tenseEl = mk(MUSIC_BASE + set.tense);
+    streamEls = [mainEl, tenseEl];
     let settled = false;
     const fail = () => { if (!settled) { settled = true; rej(new Error("media blocked too")); } };
     mainEl.addEventListener("error", fail);
@@ -2270,13 +2289,18 @@ function makeAudio() {
     setTimeout(fail, 12000);
   });
 
-  const startMusic = () => {
-    if (musicStarted || !armed) return;
+  const startMusic = (setIdx) => {
+    if (!armed) return;
+    const idx = setIdx || 0;
+    if (musicStarted && idx === curSetIdx) return; // already on this set
     const c = wake(); if (!c) return;
+    if (musicStarted) stopAllMusic();              // switching sets: hard restart
     musicStarted = true;
-    startBuffered(c)
-      .catch(() => startStreamed(c))
-      .catch((e) => { musicStarted = false; if (onMusicFail) onMusicFail(e && e.message ? e.message : String(e)); });
+    curSetIdx = idx;
+    const set = MUSIC_SETS[idx % MUSIC_SETS.length];
+    startBuffered(c, set)
+      .catch(() => startStreamed(c, set))
+      .catch((e) => { musicStarted = false; curSetIdx = -1; if (onMusicFail) onMusicFail(e && e.message ? e.message : String(e)); });
   };
 
   const setTense = (on) => {
@@ -2460,9 +2484,16 @@ export default function Luckhead() {
   useEffect(() => {
     if (audioReady && audio.current) {
       audio.current.onMusicFail((why) => setMusicDead(why || "unknown"));
-      audio.current.startMusic();
+      audio.current.startMusic((st.elected || 0) % 4);
     }
   }, [audioReady]);
+
+  // New term, new theme. The set index follows terms won and wraps every four,
+  // so a fifth term reuses the first set. startMusic ignores a repeat index, so
+  // this only ever fires a real switch.
+  useEffect(() => {
+    if (audioReady && audio.current) audio.current.startMusic((st.elected || 0) % 4);
+  }, [st.elected, audioReady]);
 
   // The tense layer rises when any of these is true and drains once all clear:
   // crime past 50, approval under 50, or an election ten days out or closer.
