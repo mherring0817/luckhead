@@ -18,6 +18,7 @@ const C = {
   ink: "#1b130c",
   water: "#3d6b7a",
   beat: "#6fa8c4",    // patrol blue, only ever seen through the coverage lens
+  school: "#d97a94",  // schoolhouse rose, same lens, different roster
   woods: "#3f6b3c",
 };
 
@@ -144,9 +145,9 @@ const UPGRADES = {
             { name: "Basilica",        cost: 380, set: { jobs: 7, upkeep: 8, faith: 7, pow: 2 } }],
   hall:    [{ name: "Secured City Hall", cost: 260, set: { upkeep: 11, jobs: 2, guard: 3 } }],
   police:  [{ name: "RoboCops",        cost: 300, set: { jobs: 1, upkeep: 16, reach: 4 } }],
-  school:  [{ name: "Middle School",   cost: 140, set: { jobs: 6, upkeep: 7, learn: 1.6 } },
+  school:  [{ name: "Middle School",   cost: 140, set: { jobs: 6, upkeep: 7, learn: 1.6, reach: 4 } },
             { name: "High School",     cost: 240, set: { jobs: 9, upkeep: 10, learn: 2.3, pow: 2 } },
-            { name: "Community College", cost: 400, set: { jobs: 13, upkeep: 14, learn: 3.2, pow: 2 } }],
+            { name: "Community College", cost: 400, set: { jobs: 13, upkeep: 14, learn: 3.2, pow: 2, reach: 5 } }],
   speaker: [{ name: "Public Address",  cost: 100, set: { upkeep: 4, message: 1.6 } },
             { name: "Civic Broadcast", cost: 170, set: { upkeep: 6, message: 2.2, pow: 2 } },
             { name: "The Voice of Luckhead", cost: 280, set: { upkeep: 9, message: 3, pow: 2 } }],
@@ -367,7 +368,7 @@ const FUND = {
 const FUND_KEYS = ["lean", "normal", "max"];
 const HONEYMOON = 20;   // goodwill during the first term, fading after
 const APPROVAL_INERTIA = 0.05;   // how fast approval chases its target; lower = steadier
-const CRIME_APPROVAL = 0.07;     // approval lost per point of crime over the threshold
+const CRIME_APPROVAL = 0.06;     // approval lost per point of crime over the threshold
 const FATIGUE = 2.5;    // approval target lost per term already served
 const FATIGUE_CAP = 15; // levels off after six terms
 const SUCCESSION_EVERY = 2;
@@ -467,7 +468,9 @@ function approvalRows(S, d, hap) {
   if (EV && EV.mood) push(`Event mood: ${EV.name}`, EV.mood);
   const DP = diffOf(S.diff);
   const HM = DP.politics.honeymoon, FT = DP.politics.fatigue;
-  const since = (S.elected || 0) - (S.honeymoonAt || 0);
+  const since = S.dictator
+    ? Math.floor((S.day - 1) / TERM_DAYS)
+    : (S.elected || 0) - (S.honeymoonAt || 0);
   // A successor inherits the chair, not the benefit of the doubt.
   const inherited = (S.heirCount || 0) > 0 ? 0.7 : 1;
   push("New administration goodwill", (since === 0 ? HM
@@ -597,15 +600,52 @@ function legacyScore(st) {
 
 const SAVE_KEY = "buckhead-save";  // unchanged so saves from before the rename still load
 const SAVE_VERSION = 1;
+// Storage that works everywhere the game runs. The Claude artifact sandbox has
+// window.storage and no localStorage; a normal browser (the Vercel deploy, and
+// the eventual Capacitor webview) has localStorage and no window.storage.
+async function storePut(key, value) {
+  if (typeof window === "undefined") return;
+  if (window.storage) { await window.storage.set(key, value); return; }
+  if (window.localStorage) window.localStorage.setItem(key, value);
+}
+async function storeGet(key) {
+  if (typeof window === "undefined") return null;
+  if (window.storage) {
+    const r = await window.storage.get(key);
+    return r && r.value != null ? r.value : null;
+  }
+  if (window.localStorage) return window.localStorage.getItem(key);
+  return null;
+}
 async function saveGame(st) {
   try {
-    if (typeof window !== "undefined" && window.storage) {
-      await window.storage.set(SAVE_KEY, JSON.stringify({ v: SAVE_VERSION, st }));
-    }
+    await storePut(SAVE_KEY, JSON.stringify({ v: SAVE_VERSION, st }));
   } catch (e) { /* storage is best-effort */ }
 }
 
-const EVENT_EVERY = 50;
+const HISCORE_KEY = "luckhead-hiscores";
+const HISCORE_MAX = 5;
+async function loadHiscores() {
+  try {
+    const raw = await storeGet(HISCORE_KEY);
+    if (raw) { const a = JSON.parse(raw); if (Array.isArray(a)) return a; }
+  } catch (e) { /* best effort */ }
+  return [];
+}
+// Fold a finished run into the table and persist. Returns the new table plus
+// the rank this run earned (1-based) or 0 if it did not place, so the game-over
+// screen can call out a personal best.
+async function recordHiscore(entry) {
+  let list = await loadHiscores();
+  list = list.concat([entry]).sort((a, b) => b.total - a.total).slice(0, HISCORE_MAX);
+  const rank = list.findIndex((e) => e === entry) + 1;
+  try {
+    await storePut(HISCORE_KEY, JSON.stringify(list));
+  } catch (e) { /* best effort */ }
+  return { list, rank };
+}
+
+const EVENT_EVERY = 58;   // spaced wider so crises have room to breathe between arrivals
 
 // ---- opening tutorial ----
 // Short, one at a time, each triggered by a condition rather than a timer so
@@ -805,7 +845,13 @@ const GRACE_DAYS = 60;       // a new town gets the benefit of the doubt this lo
 const earlyGrace = (day) => (day >= GRACE_DAYS ? 1 : 0.45 + 0.55 * (day / GRACE_DAYS));
 const ENV_DRIFT = 0.04;      // the environment moves slowly, like a real one
 const ENV_ALARM = 30;        // below this the whole town notices
-const CRIME_DRIFT = 0.85;    // how fast the crime bar chases its pressure
+// School coverage mirrors police coverage exactly, same reach-and-strength
+// math, but the targets are houses only and the consequence is happiness, not
+// crime. Gated on the school unlock so a brand new town isn't punished for a
+// building it cannot legally own yet.
+const SCHOOL_REACH = 3;
+const SCHOOL_UNCOVERED_WEIGHT = 12;   // happiness left on the table at 0% coverage
+const CRIME_DRIFT = 0.8;     // how fast the crime bar chases its pressure (tamped slightly)
 const SHOOTING_ODDS = 1 / 150;   // a bad night, roughly this often
 const SHOOTING_WAR = 2.2;        // and more often once the family is at odds with you
 const SHOOTING_SHOCK = 20;       // days of frozen immigration and a subdued town
@@ -849,8 +895,8 @@ function kickbackFor(deal, rigged) {
 
 
 const CRIME_THRESHOLD = 35;
-const TERM_DAYS = 120;
-const WARN_DAY = 20;    // poll lands on day 100 of each 120-day term
+const TERM_DAYS = 140;
+const WARN_DAY = 20;    // poll lands twenty days before each vote
 const LOSS_WARN_DAY = 15;   // sharper alert if you are behind with the vote near
 const MAFIA_FLAVOR = [
   "Vincent says the books look beautiful. He has not seen the books.",
@@ -923,7 +969,7 @@ function freshState(seed, diff) {
   });
 
   const DF = diff || DEFAULT_DIFF;
-  return { grid, terrain, seed: useSeed, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
+  return { grid, terrain, seed: useSeed, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
 }
 
 const rc = (i) => [Math.floor(i / SIZE), i % SIZE];
@@ -1164,7 +1210,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   // pass 3: tallies
   const targets = [], cops = [], taverns = [], polluterList = [];
   let faith = 0, cheer = 0, learning = 0, eduBuff = 0, stadiumCrime = 0, cameras = 0, churchWeight = 0, loudChurches = 0;
-  const buses = [], shops = [], venues = [], schools = [], prisons = [];
+  const buses = [], shops = [], venues = [], schools = [], prisons = [], schoolCov = [];
   let rowdiness = 0, held = 0, care = 0, message = billboardMsg;
   const medical = [];
 
@@ -1226,6 +1272,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
         jobs += b.jobs;
         learning += (b.learn || 1) * smogPenalty * crew * (1 - 0.3 * noiseAt(r, c)) * (flags.doctrineSchools || 1);
         schools.push([r, c]);
+        schoolCov.push([r, c, b.reach || SCHOOL_REACH, crew]);
       }
     }
     if (cell.type === "library" || cell.type === "histcenter") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu; eduBuff += (b.edu || 0.35) * crew; }
@@ -1375,6 +1422,22 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   // Some events do not scale what you had, they simply stop the city.
   if (EV && EV.trafficFloor && roadCount) traffic = Math.max(traffic, EV.trafficFloor);
 
+  // Same computation as police coverage: each house takes the strength of its
+  // best nearby school, never the sum, so a second school over already-covered
+  // ground adds nothing. The targets are houses only, not every building.
+  let schoolFrac = 0;
+  if (houses.length) {
+    let covered = 0;
+    houses.forEach(([r, c]) => {
+      let best = 0;
+      schoolCov.forEach(([pr, pc, reach, cw]) => {
+        if (Math.abs(pr - r) + Math.abs(pc - c) <= reach) best = Math.max(best, cw === undefined ? 1 : cw);
+      });
+      covered += Math.min(1, best);
+    });
+    schoolFrac = covered / houses.length;
+  }
+
   let policeFrac = 0;
   if (cops.length && targets.length) {
     let covered = 0;
@@ -1424,6 +1487,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
            goods, learning, held, care, message, theatreOn, hideawayOn, plazaOn, fastparkOn, fastparkTax, churchTax, schoolTax, waterTax, bankCount, monumentCount, transit, buses: buses.length, venues: venues.length, rowdiness, smuggling, hallJobs, globalRelief, shops: shops.length, shopSaturation, supported,
            anyDisc, anyUnwired, anyOverload, anyUnstaffed, anyBuilding, plantBuilt, policeFrac,
            copPosts: cops, crimeTargets: targets, hallGuard: guard,
+           schoolFrac, schoolCov, houseTargets: houses,
            taverns: taverns.length, stadiumCrime, eduBuff, schoolCount: schools.length, cameras, churchWeight, churchCount: Math.round(churchWeight), loudChurches,
            envTarget, env: flags.env === undefined ? START_ENV : flags.env,
            envStacks, envPlants, envGreen, envTransit,
@@ -1451,7 +1515,12 @@ function calcHap(pop, d, mafia, crime) {
   const envNow = d.env === undefined ? 100 : d.env;
   const envPain = envNow >= ENV_ALARM ? 0 : (ENV_ALARM - envNow) * 0.45;
   const gr = d.grace === undefined ? 1 : d.grace;
-  let h = 58 + d.envAvg + d.tavernMood + Math.min(10, 1.6 * (d.care || 0)) + (d.protestMood || 0) - unemp * gr - homeless * gr - piety - loudPenalty - envPain - 24 * (d.traffic || 0);
+  // Nothing to answer for before the building exists: gated on the same
+  // unlock that lets a school be built at all, then eased in like the other
+  // structural pains while the town is young.
+  const schoolGate = Math.floor(pop) >= UNLOCK.school ? 1 : 0;
+  const schoolPain = schoolGate * SCHOOL_UNCOVERED_WEIGHT * (1 - Math.min(1, d.schoolFrac || 0)) * gr;
+  let h = 58 + d.envAvg + d.tavernMood + Math.min(10, 1.6 * (d.care || 0)) + (d.protestMood || 0) - unemp * gr - homeless * gr - piety - loudPenalty - envPain - 24 * (d.traffic || 0) - schoolPain;
   if (mafia === "allied") h -= 10;
   if (mafia === "refused") h -= (crime || 0) * 0.25;
   return Math.round(Math.min(100, Math.max(5, h)));
@@ -1524,7 +1593,13 @@ function step(prev) {
   const apRows = approvalRows({ ...prev, pop, crime, mafia,
     challengerDrag: attack, challengerLabel: prev.challenger ? prev.challenger.label : "" }, d, baseHap);
   const target = apRows.reduce((a, [, v]) => a + v, 0);
-  let approval = prev.approval + (target - prev.approval) * DP.politics.inertia;
+  // Approval rises at the tuned inertia but sinks at two-thirds of it, so the
+  // mood is quicker to forgive than to sour. Crime's daily drag below is
+  // separate and still bites at full strength.
+  const APPROVAL_FALL = 0.66;
+  const gap = target - prev.approval;
+  const rate = DP.politics.inertia * (gap < 0 ? APPROVAL_FALL : 1);
+  let approval = prev.approval + gap * rate;
   if (crime > CRIME_THRESHOLD) approval -= (crime - CRIME_THRESHOLD) * CRIME_APPROVAL;
   approval = Math.min(100, Math.max(0, approval));
   const day = prev.day + 1;
@@ -1615,7 +1690,7 @@ function step(prev) {
   let promiseSeq = prev.promiseSeq || 0;
   let promiseBroken = prev.promiseBroken || 0;
   let promiseKept = prev.promiseKept || 0;
-  if (speech === 0 && toVote === SPEECH_BEFORE && day > CRIME_GRACE) speech = 1;
+  if (!prev.dictator && speech === 0 && toVote === SPEECH_BEFORE && day > CRIME_GRACE) speech = 1;
   if (speech >= 2 && toVote > SPEECH_BEFORE) speech = 0;   // re-arm for the next cycle
 
   // A promise in flight. Two of the three can be broken the moment you slip;
@@ -1640,7 +1715,7 @@ function step(prev) {
     }
   }
 
-  if (campaign !== 1 && speakerCount >= 2 && toVote === 30
+  if (!prev.dictator && campaign !== 1 && speakerCount >= 2 && toVote === 30
       && (prev.campaignUntil || 0) < day) campaign = 1;
 
   // A miserable town does not stay quiet forever. Three straight days below
@@ -1860,8 +1935,8 @@ function step(prev) {
     }
   }
 
-  // While the war with the family runs, Vincent's people set fires. Every 7
-  // days there is a 35% chance an arsonist levels a building, favoring police
+  // While the family holds a grudge, Vincent's people set fires. Every couple
+  // of weeks there is a chance an arsonist levels a building, favoring police
   // stations and then the most expensive targets. City Hall is untouchable.
   let arsonDay = prev.arsonDay || 0;
   let arsonCount = prev.arsonCount || 0;
@@ -1880,9 +1955,10 @@ function step(prev) {
   const sinceWar = tsuiWar > 0 ? day - tsuiWar : -1;
   // Fifteen days after you break with them, one goes up. Not a roll, a promise.
   const reprisalDue = tsuiWar > 0 && sinceWar === 15 && arsonDay !== day;
-  // Otherwise the fires come on a weekly cadence, hotter while the war is fresh.
-  const warHeat = sinceWar >= 0 && sinceWar <= 60 ? 0.40 : 0.25;
-  const weeklyDue = atOddsWithTsui && day % 11 === 0 && arsonDay !== day
+  // Otherwise the fires come every couple of weeks, hotter while the war is
+  // fresh, and never as a certainty.
+  const warHeat = sinceWar >= 0 && sinceWar <= 60 ? 0.35 : 0.22;
+  const weeklyDue = atOddsWithTsui && day % 14 === 0 && arsonDay !== day
     && evRoll(53) < warHeat;
   if (reprisalDue || weeklyDue) {
       // Score every standing, finished building. Police first, then by the
@@ -1989,11 +2065,11 @@ function step(prev) {
   const cycle = Math.floor((day - 1) / TERM_DAYS);
   const untilVote = TERM_DAYS - ((day - 1) % TERM_DAYS) - 1;
   let lossWarned = prev.lossWarned || 0;
-  if (untilVote <= LOSS_WARN_DAY && lossWarned <= cycle && Math.round(prev.approval) < 51) {
+  if (!prev.dictator && untilVote <= LOSS_WARN_DAY && lossWarned <= cycle && Math.round(prev.approval) < 51) {
     lossWarned = cycle + 1;
   }
   let polled = prev.polled, challenger = prev.challenger;
-  if (untilVote <= WARN_DAY && polled <= cycle) {
+  if (!prev.dictator && untilVote <= WARN_DAY && polled <= cycle) {
     polled = cycle + 1;
     challenger = makeChallenger(prev.seed, cycle,
       challengerCtx(pop, d, hap, { crime, ties, rigged: prev.rigged, testified: prev.testified }));
@@ -2003,7 +2079,7 @@ function step(prev) {
   let broke = prev.broke || false;
   if (fed === 2) over = true;
   let lastElection = prev.lastElection, electionSeen = prev.electionSeen || 0;
-  if (day % TERM_DAYS === 0) {
+  if (!prev.dictator && day % TERM_DAYS === 0) {
     const atk = challengerAttack(challenger, attackCtx);
     const youPct = Math.round(approval);
     const won = youPct >= 51;
@@ -2348,6 +2424,7 @@ export default function Luckhead() {
   const [needsDiff, setNeedsDiff] = useState(false);
   const [pickDiff, setPickDiff] = useState(DEFAULT_DIFF);
   const [pickHints, setPickHints] = useState(true);
+  const [pickDictator, setPickDictator] = useState(false);
   const lastSave = useRef(0);
 
   // Load a saved city once, on launch. Anything malformed starts fresh.
@@ -2356,8 +2433,9 @@ export default function Luckhead() {
     let loadedSave = false;
     (async () => {
       try {
-        if (typeof window !== "undefined" && window.storage) {
-          const r = await window.storage.get(SAVE_KEY);
+        if (typeof window !== "undefined") {
+          const raw = await storeGet(SAVE_KEY);
+          const r = raw != null ? { value: raw } : null;
           if (r && r.value) {
             const data = JSON.parse(r.value);
             if (data && data.v === SAVE_VERSION && data.st && Array.isArray(data.st.grid) && data.st.grid.length === N) {
@@ -2426,6 +2504,12 @@ export default function Luckhead() {
   const prevRiot = useRef(0);
   const prevViral = useRef(0);
   const prevElected = useRef(0);
+  const [hiscores, setHiscores] = useState([]);
+  const [hiRank, setHiRank] = useState(0);
+  const hiRecorded = useRef(false);
+  // Load the table once on boot so it can show on the game-over screen even
+  // before this run is folded in.
+  useEffect(() => { loadHiscores().then(setHiscores); }, []);
   const prevPolled = useRef(0);
   const prevLossWarn = useRef(0);
   const prevFed = useRef(0);
@@ -2513,7 +2597,7 @@ export default function Luckhead() {
 
   // The tense layer rises when any of these is true and drains once all clear:
   // crime past 50, approval under 50, or an election ten days out or closer.
-  const tenseMusic = st.crime > 50 || st.approval < 50 || toElection <= 10;
+  const tenseMusic = st.crime > 50 || st.approval < 50 || (!st.dictator && toElection <= 10);
   useEffect(() => {
     if (audio.current) audio.current.setTense(tenseMusic && !st.over);
   }, [tenseMusic, st.over]);
@@ -2665,6 +2749,24 @@ export default function Luckhead() {
     : "alert"); }, [active]);
   useEffect(() => { if (st.over) sfx("lose"); }, [st.over]);
 
+  // Record the finished run exactly once. legacyScore is the same figure the
+  // game-over screen shows, so the table and the screen never disagree.
+  useEffect(() => {
+    if (!st.over || hiRecorded.current || st.dictator) return;
+    hiRecorded.current = true;
+    const L = legacyScore(st);
+    const d = st.diff || DEFAULT_DIFF;
+    const entry = {
+      total: L.total, title: L.title, days: st.day,
+      diff: `${DIFFICULTY.economy[d.economy].label[0]}/${DIFFICULTY.politics[d.politics].label[0]}/${DIFFICULTY.crime[d.crime].label[0]}`,
+      when: Date.now(),
+    };
+    recordHiscore(entry).then(({ list, rank }) => { setHiscores(list); setHiRank(rank); });
+  }, [st.over]);
+
+  // A fresh game re-arms the recorder for next time.
+  useEffect(() => { if (!st.over) { hiRecorded.current = false; setHiRank(0); } }, [st.over]);
+
   // Tutorial hints: shown one at a time, never blocking, and only while the
   // player is still finding their feet.
   const seenHints = st.hintsSeen || [];
@@ -2729,7 +2831,7 @@ export default function Luckhead() {
     // Keep whatever theme is already playing; a new game should not interrupt
     // the song the title screen started on. Only a re-election changes it.
     const keepSet = st.musicSet;
-    const next = { ...freshState(seed, diff || pickDiff), hintsOn: pickHints, musicSet: keepSet };
+    const next = { ...freshState(seed, diff || pickDiff), hintsOn: pickHints, musicSet: keepSet, dictator: pickDictator };
     lastSave.current = Date.now();
     saveGame(next);
     setSt(next);
@@ -2776,7 +2878,7 @@ export default function Luckhead() {
     if (d.traffic > 0.35) return `Traffic is choking ${d.congested} street${d.congested > 1 ? "s" : ""}. Add parallel roads so trips spread out.`;
     if (hap < 45 && fp < d.popCap) return `Happiness is ${hap}, so nobody is moving in. A ☣️ badge means pollution. Parks help, distance helps more.`;
     if (st.crime > CRIME_THRESHOLD) return `Crime is at ${Math.round(st.crime)} and dragging approval down. Police cover a radius, Churches calm the whole town.`;
-    if (Math.round(st.approval) < 51 && toElection <= WARN_DAY) return `Approval is under 51 with the election in ${toElection} days. Parks, jobs, and prayers.`;
+    if (!st.dictator && Math.round(st.approval) < 51 && toElection <= WARN_DAY) return `Approval is under 51 with the election in ${toElection} days. Parks, jobs, and prayers.`;
     if (fp >= 6 && d.jobs < fp * 0.7) return "Unemployment is brewing. Shops and Factories make jobs.";
     if (hap < 40) return "Morale is low. Parks near homes, factories far from them.";
     if (st.money < 50 && net <= 0) return st.tax === "none" ? "The treasury is empty and you collect no taxes. Something has to give." : "The treasury is thin. Residents and jobs pay taxes.";
@@ -2954,13 +3056,11 @@ export default function Luckhead() {
   const mono = { fontFamily: "ui-monospace, Menlo, monospace" };
 
   // Which tiles a patrol reaches, and which of the buildings crime is measured
-  // against are standing outside all of them. The lens shows both: coverage is
-  // the answer, uncovered targets are the question.
-  const beatMap = useMemo(() => {
-    if (!beat) return null;
-    const posts = d.copPosts || [];
-    const targs = d.crimeTargets || [];
-    const strength = new Map();   // tile index -> best patrol strength on it
+  // against are standing outside all of them, plus the same question asked of
+  // schools against houses instead. One lens, two rosters: coverage is the
+  // answer, uncovered targets are the question, for police and schools alike.
+  const reachMap = (posts) => {
+    const strength = new Map();
     posts.forEach(([pr, pc, reach, cw]) => {
       const s = cw === undefined ? 1 : cw;
       for (let r = pr - reach; r <= pr + reach; r++) {
@@ -2972,6 +3072,11 @@ export default function Luckhead() {
         }
       }
     });
+    return strength;
+  };
+  const beatMap = useMemo(() => {
+    if (!beat) return null;
+    const strength = reachMap(d.copPosts || []);
     const guarded = new Set();
     if (d.hallGuard) {
       const [gr, gc, rad] = d.hallGuard;
@@ -2982,10 +3087,18 @@ export default function Luckhead() {
         }
       }
     }
+    const targs = d.crimeTargets || [];
     const naked = new Set();
     targs.forEach(([r, c]) => { const k = at0(r, c); if (!strength.has(k)) naked.add(k); });
-    return { strength, guarded, naked, targets: targs.length };
-  }, [beat, d.copPosts, d.crimeTargets, d.hallGuard]);
+
+    const schoolStrength = reachMap(d.schoolCov || []);
+    const houseTargs = d.houseTargets || [];
+    const schoolNaked = new Set();
+    houseTargs.forEach(([r, c]) => { const k = at0(r, c); if (!schoolStrength.has(k)) schoolNaked.add(k); });
+
+    return { strength, guarded, naked, targets: targs.length,
+             schoolStrength, schoolNaked, houses: houseTargs.length };
+  }, [beat, d.copPosts, d.crimeTargets, d.hallGuard, d.schoolCov, d.houseTargets]);
 
   const Tile = ({ i }) => {
     const cell = st.grid[i];
@@ -3083,9 +3196,21 @@ export default function Luckhead() {
                   background: C.amber, opacity: 0.16, pointerEvents: "none", zIndex: 4 }} />
               )}
               {/* a building crime is counted against, with nobody watching it */}
-              {bare && (
+              {/* school catchment, rose instead of blue so the two never read as one thing */}
+              {beatMap.schoolStrength.get(i) !== undefined && (
                 <span style={{ position: "absolute", inset: 0, borderRadius: isHall ? 0 : 4,
-                  boxShadow: `inset 0 0 0 2px ${C.red}`, pointerEvents: "none", zIndex: 5 }} />
+                  background: C.school, opacity: 0.12 + 0.30 * Math.min(1, beatMap.schoolStrength.get(i)),
+                  pointerEvents: "none", zIndex: 4 }} />
+              )}
+              {/* uncovered rings, combined in one shadow so a house missing both stays
+                  legible as both: police hugs the edge, school sits just inside it. */}
+              {(bare || beatMap.schoolNaked.has(i)) && (
+                <span style={{ position: "absolute", inset: 0, borderRadius: isHall ? 0 : 4,
+                  boxShadow: [
+                    bare ? `inset 0 0 0 2px ${C.red}` : null,
+                    beatMap.schoolNaked.has(i) ? `inset 0 0 0 4px ${C.school}` : null,
+                  ].filter(Boolean).join(", "),
+                  pointerEvents: "none", zIndex: 5 }} />
               )}
             </>
           );
@@ -3204,6 +3329,29 @@ export default function Luckhead() {
 
           <div style={{ marginBottom: 16 }}>
             <div style={{ ...disp, fontSize: 14, letterSpacing: "0.1em", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+              <span>👑</span><span>MODE</span>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[["mayor", "Mayor", false], ["dictator", "Dictator", true]].map(([k, label, val]) => {
+                const on = pickDictator === val;
+                return (
+                  <div key={k} onClick={() => setPickDictator(val)}
+                    style={{ flex: 1, cursor: "pointer", padding: "8px 6px", borderRadius: 10, textAlign: "center",
+                             background: on ? C.bg : "transparent", border: `1px solid ${on ? C.orange : C.line}` }}>
+                    <div style={{ ...disp, fontSize: 13, color: on ? C.orange : C.cream }}>{label}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ ...mono, fontSize: 9.5, color: C.dim, marginTop: 5, lineHeight: 1.4, minHeight: 26 }}>
+              {pickDictator
+                ? "No elections, ever. Rule until the treasury runs dry or the feds close in. Nobody hands you a fresh start, so old trouble never gets amnestied. No score at the end, just how far you got."
+                : "Face the voters every term. Fall under 51% and it's over."}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ ...disp, fontSize: 14, letterSpacing: "0.1em", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
               <span>💡</span><span>FIRST TIME HERE?</span>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -3225,12 +3373,21 @@ export default function Luckhead() {
             </div>
           </div>
 
+          {pickDictator ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, marginBottom: 16, padding: "10px 12px",
+                          background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10 }}>
+              <span style={{ ...mono, fontSize: 10, color: C.dim }}>SCORING</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ ...disp, fontSize: 13, color: C.dim }}>none — this is a sandbox</span>
+            </div>
+          ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, marginBottom: 16, padding: "10px 12px", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10 }}>
             <span style={{ ...mono, fontSize: 10, color: C.dim }}>SCORE MULTIPLIER</span>
             <span style={{ flex: 1 }} />
             <span style={{ ...disp, fontSize: 22, color: mult >= 1 ? C.green : C.amber }}>×{mult.toFixed(2)}</span>
           </div>
 
+          )}
           <div onClick={() => doReset(undefined, pickDiff)}
             style={{ ...disp, fontSize: 18, textAlign: "center", background: C.orange, color: C.ink, borderRadius: 12, padding: "12px 0", cursor: "pointer", letterSpacing: "0.08em" }}>
             TAKE OFFICE
@@ -3306,7 +3463,7 @@ export default function Luckhead() {
         <span style={{ flex: 1 }} />
         <span
           onClick={() => setBeat((b) => !b)}
-          title={beat ? "Hide police coverage" : "Show police coverage"}
+          title={beat ? "Hide coverage" : "Show coverage (police & schools)"}
           style={{ cursor: "pointer", padding: "2px 6px", borderRadius: 7,
                    border: `1px solid ${beat ? C.orange : C.line}`,
                    background: beat ? C.orange : "transparent",
@@ -3573,26 +3730,42 @@ export default function Luckhead() {
       </div>
 
       {beatMap && (
-        <div style={{ width: boardW, marginTop: 6, display: "flex", alignItems: "center", flexWrap: "wrap",
-                      gap: 10, ...mono, fontSize: 9.5, color: C.dim }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 2, background: C.beat, opacity: 0.6 }} />
-            patrolled
-          </span>
-          {d.hallGuard && (
+        <div style={{ width: boardW, marginTop: 6, display: "flex", flexDirection: "column", gap: 4,
+                      ...mono, fontSize: 9.5, color: C.dim }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 9, height: 9, borderRadius: 2, background: C.amber, opacity: 0.5 }} />
-              hall detail
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: C.beat, opacity: 0.6 }} />
+              patrolled
             </span>
-          )}
-          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 2, boxShadow: `inset 0 0 0 2px ${C.red}` }} />
-            {beatMap.naked.size} unwatched
-          </span>
-          <span style={{ flex: 1 }} />
-          <span style={{ color: d.policeFrac >= 0.9 ? C.green : d.policeFrac >= 0.5 ? C.amber : C.red }}>
-            coverage {Math.round((d.policeFrac || 0) * 100)}%
-          </span>
+            {d.hallGuard && (
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 9, height: 9, borderRadius: 2, background: C.amber, opacity: 0.5 }} />
+                hall detail
+              </span>
+            )}
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, boxShadow: `inset 0 0 0 2px ${C.red}` }} />
+              {beatMap.naked.size} unwatched
+            </span>
+            <span style={{ flex: 1 }} />
+            <span style={{ color: d.policeFrac >= 0.9 ? C.green : d.policeFrac >= 0.5 ? C.amber : C.red }}>
+              police {Math.round((d.policeFrac || 0) * 100)}%
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: C.school, opacity: 0.6 }} />
+              school district
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, boxShadow: `inset 0 0 0 2px ${C.school}` }} />
+              {beatMap.schoolNaked.size} unenrolled
+            </span>
+            <span style={{ flex: 1 }} />
+            <span style={{ color: d.schoolFrac >= 0.9 ? C.green : d.schoolFrac >= 0.5 ? C.amber : C.red }}>
+              school {Math.round((d.schoolFrac || 0) * 100)}%
+            </span>
+          </div>
         </div>
       )}
 
@@ -3633,7 +3806,7 @@ export default function Luckhead() {
             onPick={() => {
               const next = tool === k ? null : k;
               setTool(next);
-              if (next === "police" || next === "camera") setBeat(true);
+              if (next === "police" || next === "camera" || next === "school") setBeat(true);
               setNote(BUILD[k].hint);
             }}
           />
@@ -3774,28 +3947,64 @@ export default function Luckhead() {
                   ? `${el.name} won it ${100 - el.youPct} to ${el.youPct} on "${el.label}". The concession call was short.`
                   : "Luckhead went to the polls and chose somebody else."}
               </div>
-              <div style={{ ...mono, fontSize: 9.5, color: C.orange, letterSpacing: "0.2em", marginBottom: 4 }}>THE LEGACY</div>
-              {L.items.map(([label, v]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0" }}>
-                  <span style={{ color: C.dim }}>{label}</span>
-                  <span style={{ color: v < 0 ? C.red : C.cream }}>{v >= 0 ? "+" : ""}{v}</span>
+              {st.dictator ? (
+                <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 8 }}>
+                  <div style={{ ...mono, fontSize: 9.5, color: C.orange, letterSpacing: "0.2em", marginBottom: 6 }}>THE REGIME, IN NUMBERS</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0" }}>
+                    <span style={{ color: C.dim }}>Days in power</span><span style={{ color: C.cream }}>{st.day}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0" }}>
+                    <span style={{ color: C.dim }}>Peak population</span><span style={{ color: C.cream }}>{st.peakPop || 0}</span>
+                  </div>
+                  <div style={{ ...mono, fontSize: 9.5, color: C.dim, marginTop: 8, lineHeight: 1.4 }}>
+                    No score. No election ever asked what Luckhead thought of you.
+                  </div>
                 </div>
-              ))}
-              {L.halved && (
-                <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0", color: C.red }}>
-                  <span>{st.broke ? "Municipal bankruptcy" : "Federal indictment"}</span><span>score halved</span>
+              ) : (
+                <>
+                  <div style={{ ...mono, fontSize: 9.5, color: C.orange, letterSpacing: "0.2em", marginBottom: 4 }}>THE LEGACY</div>
+                  {L.items.map(([label, v]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0" }}>
+                      <span style={{ color: C.dim }}>{label}</span>
+                      <span style={{ color: v < 0 ? C.red : C.cream }}>{v >= 0 ? "+" : ""}{v}</span>
+                    </div>
+                  ))}
+                  {L.halved && (
+                    <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0", color: C.red }}>
+                      <span>{st.broke ? "Municipal bankruptcy" : "Federal indictment"}</span><span>score halved</span>
+                    </div>
+                  )}
+                  {L.mult !== 1 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0", color: L.mult > 1 ? C.green : C.amber }}>
+                      <span>Difficulty ({DIFFICULTY.economy[(st.diff || DEFAULT_DIFF).economy].label[0]}/{DIFFICULTY.politics[(st.diff || DEFAULT_DIFF).politics].label[0]}/{DIFFICULTY.crime[(st.diff || DEFAULT_DIFF).crime].label[0]})</span><span>{L.base} × {L.mult.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ ...disp, fontSize: 13, color: C.dim }}>{L.title}</span>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ ...disp, fontSize: 24, color: C.orange }}>{L.total}</span>
+                  </div>
+                </>
+              )}
+              {!st.dictator && hiscores.length > 0 && (
+                <div style={{ marginTop: 14, borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+                  <div style={{ ...mono, fontSize: 9.5, color: C.orange, letterSpacing: "0.2em", marginBottom: 6 }}>
+                    {hiRank === 1 ? "A NEW BEST" : hiRank > 0 ? `HALL OF FAME \u00b7 YOU PLACED #${hiRank}` : "HALL OF FAME"}
+                  </div>
+                  {hiscores.map((h, i) => {
+                    const mine = hiRank > 0 && i === hiRank - 1;
+                    return (
+                      <div key={h.when + "-" + i} style={{ display: "flex", alignItems: "baseline", gap: 8, ...mono, fontSize: 10.5,
+                        padding: "2px 4px", borderRadius: 4, background: mine ? "rgba(242,118,46,0.16)" : "transparent" }}>
+                        <span style={{ color: C.dim, width: 16 }}>{i + 1}</span>
+                        <span style={{ color: mine ? C.orange : C.cream, ...disp, fontSize: 13, width: 54 }}>{h.total}</span>
+                        <span style={{ color: C.dim, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.title}</span>
+                        <span style={{ color: C.dim }}>{h.diff}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-              {L.mult !== 1 && (
-                <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0", color: L.mult > 1 ? C.green : C.amber }}>
-                  <span>Difficulty ({DIFFICULTY.economy[(st.diff || DEFAULT_DIFF).economy].label[0]}/{DIFFICULTY.politics[(st.diff || DEFAULT_DIFF).politics].label[0]}/{DIFFICULTY.crime[(st.diff || DEFAULT_DIFF).crime].label[0]})</span><span>{L.base} × {L.mult.toFixed(2)}</span>
-                </div>
-              )}
-              <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span style={{ ...disp, fontSize: 13, color: C.dim }}>{L.title}</span>
-                <span style={{ flex: 1 }} />
-                <span style={{ ...disp, fontSize: 24, color: C.orange }}>{L.total}</span>
-              </div>
               <div style={{ display: "flex", marginTop: 12 }}>
                 <span style={{ flex: 1 }} />
                 <span onClick={() => { setPickDiff(st.diff || DEFAULT_DIFF); setNeedsDiff(true); }} style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.orange, color: C.ink, borderRadius: 9, padding: "6px 12px" }}>
@@ -3939,7 +4148,7 @@ export default function Luckhead() {
             <div onClick={(e) => e.stopPropagation()} style={{ width: "min(94vw, 390px)", maxHeight: "88vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
               <div style={{ ...disp, fontSize: 22, letterSpacing: "0.04em" }}>CITY HALL</div>
               <div style={{ ...mono, fontSize: 10, color: C.dim, marginBottom: 4 }}>
-                Day {st.day} · {TIERS[tier].name} · {st.elected} term{st.elected === 1 ? "" : "s"} served
+                Day {st.day} · {TIERS[tier].name}{!st.dictator ? ` · ${st.elected} term${st.elected === 1 ? "" : "s"} served` : ""}
               </div>
               {st.heir && (
                 <div style={{ ...mono, fontSize: 10, color: C.amber, marginBottom: 4 }}>
@@ -5488,7 +5697,7 @@ export default function Luckhead() {
                   "Debt. Below −$3,000 the state takes the city.",
                 ]],
                 ["ELECTIONS", [
-                  "Every 120 days you need 51%. That number never changes.",
+                  "Every 140 days you need 51%. That number never changes.",
                   "The opposition runs on your worst stat and drains approval daily until you fix it.",
                   "Your first term carries goodwill. Every term after polls a little worse.",
                   "Every two terms you name a successor, which resets fatigue and wipes all Tsui deals.",
