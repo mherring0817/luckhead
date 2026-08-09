@@ -225,13 +225,15 @@ function scoreMult(diff) {
   return r.economy.score * r.politics.score * r.crime.score;
 }
 
+const HEAD_TAX = 1.15;       // residents pay slightly better than they used to
 const COST_SCALE = 1.12;
 const LOAN_PENALTY = 0.05;   // each loan raises build costs 5%, permanently
+const GRAFT_PENALTY = 0.12;  // score lost per dollar of Tsui money taken
 const DEBT_FLOOR = -3000;    // past this the state takes the city off your hands
 const MODAL_GAP = 6;         // quiet days after something that could end the run
 const MODAL_GAP_SOFT = 13;   // and a longer breather after routine business
 // Interruptions that genuinely cannot wait. Everything else is business.
-const URGENT_MODALS = new Set(["heir", "vote", "fed", "indict", "chief", "arson", "shooting"]);
+const URGENT_MODALS = new Set(["heir", "vote", "fed", "indict", "chief", "arson", "shooting", "tsuiloan"]);
 const costOf = (t, taxKey, banks = 0, loans = 0, costMul = 1) => {
   const base = Math.round(BUILD[t].cost * COST_SCALE * costMul * (1 + LOAN_PENALTY * (loans || 0)) * (1 - 0.04 * Math.min(3, banks)));
   const T = TAX[taxKey] || TAX.normal;
@@ -320,6 +322,21 @@ const TIERS = [
   { min: 120, name: "Metropolis" },
 ];
 
+// Read out at every promotion. Five quotations across four possible tier-ups,
+// so a single run never hears the same one twice and no two runs are alike.
+const GOV_QUOTES = [
+  { text: "Under socialism all will govern in turn and will soon become accustomed to no one governing.",
+    who: "Vladimir Lenin", src: "The State and Revolution, 1917" },
+  { text: "The whole art of government consists in the art of being honest.",
+    who: "Thomas Jefferson", src: "A Summary View of the Rights of British America, 1774" },
+  { text: "I have simplified my politics into an utter detestation of all existing governments.",
+    who: "Lord Byron", src: "Letters and Journals" },
+  { text: "It is much more important to kill bad bills than to pass good ones.",
+    who: "Calvin Coolidge", src: "The Autobiography of Calvin Coolidge, 1929" },
+  { text: "All forms of the state have democracy for their truth, and for that reason are false to the extent that they are not democracy.",
+    who: "Karl Marx", src: "Critique of Hegel's Philosophy of Right, 1843" },
+];
+
 const FLAVOR = [
   "A citizen suggested the factory could smell less like regret.",
   "Roads to nowhere are still roads. Philosophically.",
@@ -330,6 +347,9 @@ const FLAVOR = [
   "The pigeons approve of the new perches.",
 ];
 
+const TSUI_LOAN_TRIGGER = 500;   // treasury low-water mark that brings the offer
+const TSUI_LOAN_AMOUNT = 2000;
+const TSUI_LOAN_DAYS = 90;       // how long the force stays gutted afterward
 const MAFIA_POP = 30;
 
 // Tax policy. Multipliers apply to revenue, police reach, plant output and upkeep,
@@ -579,7 +599,7 @@ function legacyScore(st) {
   if (st.money < 0) add(`Debt left behind ($${Math.abs(st.money)})`, st.money * 0.35);
   if (st.heirCount) add(`Successors named (${st.heirCount})`, st.heirCount * 400);
   if (st.rigged) add(`Elections rigged (${st.rigged})`, -st.rigged * 250);
-  if (st.graft) add(`Tsui money pocketed ($${st.graft})`, -st.graft * 0.2);
+  if (st.graft) add(`Tsui money pocketed ($${st.graft})`, -st.graft * GRAFT_PENALTY);
   if (st.testified) add(`Testified against the family (${st.testifiedTies || 1} arrangement${(st.testifiedTies || 1) === 1 ? "" : "s"} confessed)`, -220 - (st.testifiedTies || 1) * 160);
   let base = items.reduce((a, [, v]) => a + v, 0);
   const halved = st.fed === 2 || st.broke;
@@ -969,7 +989,7 @@ function freshState(seed, diff) {
   });
 
   const DF = diff || DEFAULT_DIFF;
-  return { grid, terrain, seed: useSeed, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
+  return { grid, terrain, seed: useSeed, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, tsuiLoan: 0, tsuiLoanUntil: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
 }
 
 const rc = (i) => [Math.floor(i / SIZE), i % SIZE];
@@ -1539,7 +1559,13 @@ function step(prev) {
   });
   if (built) prev = { ...prev, grid };
   const T = TAX[prev.tax] || TAX.normal;
-  const F = FUND[prev.fund] || FUND.normal;
+  // The family's arrangement, read before anything that depends on the police
+  // budget: while it holds, the force runs on a shoestring no matter what the
+  // menu last said.
+  let tsuiLoan = prev.tsuiLoan || 0;
+  let tsuiLoanUntil = prev.tsuiLoanUntil || 0;
+  const fundKeyNow = tsuiLoanUntil > (prev.day + 1) ? "lean" : prev.fund;
+  const F = FUND[fundKeyNow] || FUND.normal;
   const H = HEIRS[prev.heir] || null;
   const CHF = CHIEFS[prev.chiefId] || null;
   const EV = eventById(prev.event);
@@ -1863,6 +1889,30 @@ function step(prev) {
   }
 
   // The banks notice an overdrawn city. They always do.
+  // The family reads a balance sheet as well as anyone. They make the offer
+  // once, the first time the town is genuinely short, and never again. A
+  // family that has been beaten or testified against does not come calling.
+  if (tsuiLoan === 0 && prev.money < TSUI_LOAN_TRIGGER && day > CRIME_GRACE
+      && prev.mafia !== "defeated" && !prev.testified) tsuiLoan = 1;
+
+  // Growing into a new tier is the one milestone the town reaches on its own
+  // rather than being handed. Caught once, held until acknowledged, and never
+  // re-fired if the population later falls back below the line.
+  let tierSeen = prev.tierSeen || 0;
+  let tierUp = prev.tierUp || 0;
+  let tierQuote = prev.tierQuote || 0;
+  let quotesUsed = prev.quotesUsed || [];
+  const tierNow = tierIdx(Math.floor(pop));
+  if (tierNow > tierSeen && !tierUp) {
+    tierUp = tierNow;
+    // Draw from the quotations this run has not used yet, refilling only if a
+    // town somehow outlives the whole list.
+    const unused = GOV_QUOTES.map((_, i) => i).filter((i) => quotesUsed.indexOf(i) < 0);
+    const pool = unused.length ? unused : GOV_QUOTES.map((_, i) => i);
+    tierQuote = pool[Math.floor(Math.random() * pool.length)];
+    quotesUsed = (unused.length ? quotesUsed : []).concat([tierQuote]);
+  }
+
   let loanOffer = prev.loanOffer || 0;
   const hasBank = prev.grid.some((c) => c && c.type === "bank" && !c.build);
   if (loanOffer === 0 && hasBank && prev.money < -50) loanOffer = 1;
@@ -2094,7 +2144,7 @@ function step(prev) {
     else over = true;
   }
 
-  const taxes = Math.round(Math.floor(pop) * T.taxRate) + (d.fastparkTax || 0) + (d.churchTax || 0) + (d.schoolTax || 0) + (d.waterTax || 0);
+  const taxes = Math.round(Math.floor(pop) * T.taxRate * HEAD_TAX) + (d.fastparkTax || 0) + (d.churchTax || 0) + (d.schoolTax || 0) + (d.waterTax || 0);
   const windfall = (event && event !== prev.event && eventById(event)?.cash) || 0;
   // Why the numbers moved today, so a bad week is legible in The Books.
   const notes = [];
@@ -2116,8 +2166,8 @@ function step(prev) {
   const money = prev.money + net;
   if (money <= DEBT_FLOOR) { over = true; broke = true; }
   const log = newEntries.length ? [...(prev.log || []), ...newEntries].slice(-LOG_KEEP) : (prev.log || []);
-  return { ...prev, musicSet, log, logSeq, env, speech, promise, promiseDay, promiseSeq, promiseBroken, promiseKept, pop, money, broke, day, mafia, crime, calm, approval, over, elected, ledger, polled, lossWarned, unlocked, chief, smuggleOffer, venueDay, venueOffer, fed, heat, ties, reprisal, dayUnlocked, succession, tsuiReturn, event, eventEnds, eventSeen, nextEvent, challenger, lastElection, electionSeen, theatreDay, bust, pvisit, faithMeet, campaign, loanOffer, tsuiWar, chiefHit, chiefKilled, deadChiefs, vacancyReason, pendingMonument, chiefId, backroom, justBroke: false, ice, iceUntil, graffiti, graffitiUntil, graffitiSeen, billboardDay, riot, riotUntil, riotSeen, prisonDay, viral, viralSeen, viralAck, hideawayFirstDay, blackmail, blackmailSeen, blackmailUntil: prev.blackmailUntil || 0, arsonDay, arsonCount, lastArson, arsonAck, indictWarn, protest, protestUntil, moodLowDays, protestsSeen, strike, strikeUntil, strikeCool, strikesSeen, schoolDemand, cop, copUntil, copCool, doctrine, doctrineCool, lowWarn, envWarn, homelessWarn, shooting, shootingUntil, shootingDead, shootingsSeen, invest, investCool, river, riverUntil, riverCool, riversSeen, pothole, potholeCool, potholeTile, potholesSeen, press,
-    peakPop: Math.max(prev.peakPop || 0, pop), graft: (prev.graft || 0) + (mafiaMoney > 0 ? mafiaMoney : 0) };
+  return { ...prev, musicSet, tsuiLoan, tsuiLoanUntil, fund: fundKeyNow, tierSeen, tierUp, tierQuote, quotesUsed, log, logSeq, env, speech, promise, promiseDay, promiseSeq, promiseBroken, promiseKept, pop, money, broke, day, mafia, crime, calm, approval, over, elected, ledger, polled, lossWarned, unlocked, chief, smuggleOffer, venueDay, venueOffer, fed, heat, ties, reprisal, dayUnlocked, succession, tsuiReturn, event, eventEnds, eventSeen, nextEvent, challenger, lastElection, electionSeen, theatreDay, bust, pvisit, faithMeet, campaign, loanOffer, tsuiWar, chiefHit, chiefKilled, deadChiefs, vacancyReason, pendingMonument, chiefId, backroom, justBroke: false, ice, iceUntil, graffiti, graffitiUntil, graffitiSeen, billboardDay, riot, riotUntil, riotSeen, prisonDay, viral, viralSeen, viralAck, hideawayFirstDay, blackmail, blackmailSeen, blackmailUntil: prev.blackmailUntil || 0, arsonDay, arsonCount, lastArson, arsonAck, indictWarn, protest, protestUntil, moodLowDays, protestsSeen, strike, strikeUntil, strikeCool, strikesSeen, schoolDemand, cop, copUntil, copCool, doctrine, doctrineCool, lowWarn, envWarn, homelessWarn, shooting, shootingUntil, shootingDead, shootingsSeen, invest, investCool, river, riverUntil, riverCool, riversSeen, pothole, potholeCool, potholeTile, potholesSeen, press,
+    peakPop: Math.max(prev.peakPop || 0, Math.floor(pop)), graft: (prev.graft || 0) + (mafiaMoney > 0 ? mafiaMoney : 0) };
 }
 
 const tierIdx = (p) => TIERS.reduce((t, x, i) => (p >= x.min ? i : t), 0);
@@ -2698,6 +2748,7 @@ export default function Luckhead() {
   const showFaith = st.faithMeet === 1 && !st.over;
   const showCampaign = st.campaign === 1 && !st.over;
   const showLoan = st.loanOffer === 1 && !st.over;
+  const showTsuiLoan = st.tsuiLoan === 1 && !st.over;
   const showIndict = st.indictWarn === 1 && st.fed === 1 && !st.over;
   const showProtest = st.protest === 1 && !st.over;
   const showStrike = st.strike === 1 && !st.over;
@@ -2720,7 +2771,7 @@ export default function Luckhead() {
   const pendingModals = [
     ["heir", showHeir], ["vote", showVote], ["fed", showFed], ["indict", showIndict], ["protest", showProtest], ["arson", showArson], ["viral", showViral], ["speech", showSpeech], ["invest", showInvest], ["river", showRiver], ["strike", showStrike], ["cop", showCop], ["doctrine", showDoctrine], ["chief", showChief],
     ["ice", showIce], ["blackmail", showBlackmail],
-    ["loan", showLoan], ["pvisit", showPvisit], ["bust", showBust],
+    ["tsuiloan", showTsuiLoan], ["loan", showLoan], ["pvisit", showPvisit], ["bust", showBust],
     ["smuggle", showSmuggle], ["venue", showVenue], ["faith", showFaith],
     ["campaign", showCampaign], ["event", showEvent],
   ].filter(([, on]) => on).map(([k]) => k);
@@ -2741,6 +2792,11 @@ export default function Luckhead() {
   // `newMilestone` exist, because effect bodies referencing them any earlier
   // hit the temporal dead zone at runtime even though it compiles fine.
   useEffect(() => { if (newMilestone) sfx("milestone"); }, [newMilestone]);
+
+  // The promotion waits behind any milestone, chief appointment or queued
+  // modal, so two windows never stack on top of each other.
+  const showTierUp = (st.tierUp || 0) > 0 && !st.over && !newMilestone && !active && !mustPickChief;
+  useEffect(() => { if (showTierUp) { setSpeed("pause"); sfx("milestone"); } }, [showTierUp]);
   useEffect(() => { if (active) sfx(
     active === "arson" ? "fire"
     : active === "shooting" ? "gunshot"
@@ -3817,6 +3873,37 @@ export default function Luckhead() {
       </div>
 
       {/* new buildings unlocked */}
+      {showTierUp && (() => {
+        const q = GOV_QUOTES[st.tierQuote || 0] || GOV_QUOTES[0];
+        const name = (TIERS[st.tierUp] || {}).name || "";
+        const was = (TIERS[(st.tierUp || 1) - 1] || {}).name || "";
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.68)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 66, padding: 16 }}>
+            <div style={{ width: "min(88vw, 350px)", background: C.panel, border: `1px solid ${C.green}`, borderRadius: 16, padding: 18 }}>
+              <div style={{ ...mono, fontSize: 10, color: C.green, letterSpacing: "0.2em", marginBottom: 3 }}>
+                {was ? `${was.toUpperCase()} NO LONGER` : "LUCKHEAD GROWS"}
+              </div>
+              <div style={{ ...disp, fontSize: 22, marginBottom: 4 }}>LUCKHEAD IS A {name.toUpperCase()}</div>
+              <div style={{ ...mono, fontSize: 10.5, color: C.dim, marginBottom: 14 }}>
+                Population {Math.floor(st.pop)}. The sign on the road needs repainting.
+              </div>
+              <div style={{ borderLeft: `2px solid ${C.green}`, paddingLeft: 12, marginBottom: 14 }}>
+                <div style={{ fontSize: 13, lineHeight: 1.55, color: C.cream, fontStyle: "italic" }}>{q.text}</div>
+                <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 6 }}>{q.who}</div>
+                <div style={{ ...mono, fontSize: 9, color: C.dim, opacity: 0.75 }}>{q.src}</div>
+              </div>
+              <div style={{ display: "flex" }}>
+                <span style={{ flex: 1 }} />
+                <span
+                  onClick={() => { setSt((s) => ({ ...s, tierSeen: s.tierUp, tierUp: 0 })); setSpeed("play"); }}
+                  style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.green, color: C.ink, borderRadius: 9, padding: "6px 14px" }}
+                >CARRY ON</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {newMilestone && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.68)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 61 }}>
           <div style={{ width: "min(88vw, 350px)", background: C.panel, border: `1px solid ${C.orange}`, borderRadius: 16, padding: 18 }}>
@@ -5033,6 +5120,38 @@ export default function Luckhead() {
         </div>
       )}
 
+      {/* the family's emergency loan, offered once when the treasury runs dry */}
+      {show("tsuiloan") && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 63, padding: 16 }}>
+          <div style={{ width: "min(88vw, 356px)", background: C.panel, border: `1px solid ${C.amber}`, borderRadius: 16, padding: 18 }}>
+            <div style={{ ...mono, fontSize: 10, color: C.amber, letterSpacing: "0.2em", marginBottom: 3 }}>A CAR OUTSIDE CITY HALL</div>
+            <div style={{ ...disp, fontSize: 18, marginBottom: 10 }}>THE FAMILY HEARD YOU WERE SHORT</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
+              <p style={{ margin: "0 0 8px" }}>Somebody has been reading Luckhead's books, and it was not the auditor. A man you have never met offers ${TSUI_LOAN_AMOUNT.toLocaleString()} in cash, today, no paperwork.</p>
+              <p style={{ margin: 0 }}>He asks only that the police run on a shoestring for the next {TSUI_LOAN_DAYS} days. Fewer officers on the street, he says, is simply good economy.</p>
+            </div>
+            <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+              <span style={{ color: C.amber }}>TAKE IT</span> · ${TSUI_LOAN_AMOUNT.toLocaleString()} now · police locked to Shoestring for {TSUI_LOAN_DAYS} days · counts against your legacy<br />
+              <span style={{ color: C.green }}>REFUSE</span> · the treasury stays empty and the streets stay yours
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <span style={{ flex: 1 }} />
+              <span
+                onClick={() => { setSt((s) => ({ ...s, tsuiLoan: 2 })); setToast("🚗 You sent him away. The books stay empty and honest."); setSt((s) => ({ ...s, modalGap: s.day + MODAL_GAP })); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 13, background: "transparent", color: C.cream, border: `1px solid ${C.line}`, borderRadius: 10, padding: "7px 14px" }}
+              >REFUSE</span>
+              <span
+                onClick={() => { setSt((s) => ({ ...s, tsuiLoan: 2, tsuiLoanUntil: s.day + TSUI_LOAN_DAYS, fund: "lean",
+                                                 money: s.money + TSUI_LOAN_AMOUNT, graft: (s.graft || 0) + TSUI_LOAN_AMOUNT,
+                                                 modalGap: s.day + MODAL_GAP }));
+                                 setToast(`🚗 $${TSUI_LOAN_AMOUNT.toLocaleString()} in the treasury. The night shift is cancelled.`); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.amber, color: C.ink, borderRadius: 10, padding: "7px 14px" }}
+              >TAKE IT</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tsui blackmail after the first successor */}
       {show("blackmail") && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 63 }}>
@@ -5520,12 +5639,23 @@ export default function Luckhead() {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(90vw, 380px)", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
             <div style={{ ...disp, fontSize: 18 }}>POLICE FUNDING</div>
             <div style={{ ...mono, fontSize: 10.5, color: C.dim, marginBottom: 12 }}>Changes every station's roster and upkeep.</div>
+            {(st.tsuiLoanUntil || 0) > st.day && (
+              <div style={{ ...mono, fontSize: 10.5, color: C.amber, marginBottom: 12, lineHeight: 1.5,
+                            border: `1px solid ${C.amber}`, borderRadius: 10, padding: "8px 10px" }}>
+                The Tsui arrangement holds the force at a shoestring for another {(st.tsuiLoanUntil || 0) - st.day} days. You took their money; this was the price.
+              </div>
+            )}
             {FUND_KEYS.map((k) => {
               const f = FUND[k];
               const on = st.fund === k;
+              const locked = (st.tsuiLoanUntil || 0) > st.day;
               return (
-                <div key={k} onClick={() => { setSt((s) => ({ ...s, fund: k })); setNote(`Police funding set to ${f.name}.`); }}
-                  style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 11, cursor: "pointer",
+                <div key={k} onClick={() => {
+                    if (locked) { setNote("The Tsuis are holding you to the deal. The budget stays where it is."); return; }
+                    setSt((s) => ({ ...s, fund: k })); setNote(`Police funding set to ${f.name}.`);
+                  }}
+                  style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 11, cursor: locked ? "default" : "pointer",
+                           opacity: locked && !on ? 0.4 : 1,
                            background: on ? C.bg : "transparent", border: `1px solid ${on ? C.orange : C.line}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ fontSize: 15 }}>{f.icon}</span>
