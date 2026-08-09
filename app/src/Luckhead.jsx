@@ -91,6 +91,8 @@ const BUILD = {
   school:  { name: "School",      cost: 130, icon: "🏫", pow: 1, jobs: 4, upkeep: 5, learn: 1, hint: "Draws newcomers, +approval, -0.6 crime, and raises the tax take from homes within 3 tiles. Maximum of 2." },
   library: { name: "Luckhead Library", cost: 220, icon: "📚", pow: 1, jobs: 2, upkeep: 6, edu: 0.35,
     hint: "Sharpens every school in town, making each more effective. Needs a road and 2 librarians. Unlocks after your first school." },
+  mansion: { name: "Governor's Mansion", cost: 820, icon: "\uD83C\uDFDB\uFE0F", pow: 3, jobs: 5, upkeep: 26,
+    hint: "Fosters a closer relationship with the conservative governor as long as you keep the tax policy aligned with his, and provides a wonderful field trip destination for local schools. One only." },
   histcenter:{ name: "History Center", cost: 420, icon: "🏛", pow: 2, jobs: 4, upkeep: 11, edu: 0.6,
     hint: "A grander archive than the Library, and a stronger boost to every school. Pricier to build and run, and needs 4 staff." },
   stadium: { name: "Stadium",     cost: 1400, icon: "🏟️", pow: 4, jobs: 10, upkeep: 20, rev: 120, crime: 4,
@@ -174,10 +176,10 @@ const UPGRADES = {
 };
 
 // Construction time in days. Upgrades take half as long, rounded up.
-const BUILD_DAYS = { house: 3, park: 3, factory: 9, road: 0, line: 0, bridge: 3, theatre: 7, hideaway: 7, plaza: 7, fastpark: 7, library: 6, histcenter: 8, stadium: 10, hall: 0, hallpart: 0 };
-const SPECIALTY = new Set(["theatre", "hideaway", "plaza", "fastpark"]);
+const BUILD_DAYS = { house: 3, park: 3, factory: 9, road: 0, line: 0, bridge: 3, theatre: 7, hideaway: 7, plaza: 7, fastpark: 7, mansion: 7, library: 6, histcenter: 8, stadium: 10, hall: 0, hallpart: 0 };
+const SPECIALTY = new Set(["theatre", "hideaway", "plaza", "fastpark", "mansion"]);
 // Buildings the town will only tolerate so many of.
-const BUILD_CAP = { church: 3, speaker: 3, bank: 3, billboard: 3, school: 2, stadium: 1, library: 1, histcenter: 1 };
+const BUILD_CAP = { church: 3, speaker: 3, bank: 3, billboard: 3, school: 2, stadium: 1, library: 1, histcenter: 1, mansion: 1 };
 const buildDays = (t) => (BUILD_DAYS[t] !== undefined ? BUILD_DAYS[t] : 5);
 const upgradeDays = (t) => Math.ceil(buildDays(t) / 2);
 
@@ -269,7 +271,7 @@ const investedIn = (cell) => {
   for (let k = 0; k < (cell.lv || 0); k++) total += UPGRADES[cell.type][k].cost;
   return Math.round(total * COST_SCALE);
 };
-const BUILD_KEYS = ["road", "bridge", "line", "house", "shop", "factory", "plant", "park", "tavern", "church", "police", "camera", "school", "bus", "venue", "clinic", "hospital", "prison", "library", "histcenter", "stadium", "speaker", "billboard", "bank", "subway", "theatre", "hideaway", "plaza", "fastpark"];
+const BUILD_KEYS = ["road", "bridge", "line", "house", "shop", "factory", "plant", "park", "tavern", "church", "police", "camera", "school", "bus", "venue", "clinic", "hospital", "prison", "library", "histcenter", "mansion", "stadium", "speaker", "billboard", "bank", "subway", "theatre", "hideaway", "plaza", "fastpark"];
 const UNLOCK_DAY = { speaker: 40, billboard: 40, camera: 100, bank: 70 };
 // Day-gated unlocks, announced the same way population ones are. Keep this in
 // ascending day order for the same reason the population list is ordered: the
@@ -308,16 +310,22 @@ const MILESTONES = [
   { pop: 46, title: "THE PARK, SINGULAR", keys: ["fastpark"],
     body: "Faststain Park is the first landmark Luckhead can claim. No staff, no power lines, nothing but ground and civic pride. The homes beside it pay a premium in tax, and every other park in town looks a little shabbier from the day it opens.",
     tip: "It asks for money and space and nothing else. Put it where people live." },
-  { pop: 52, title: "A SCENE AND A HOSPITAL", keys: ["hospital", "venue", "histcenter"],
+  { pop: 50, title: "THE GOVERNOR'S FRIEND", keys: ["mansion"],
+    body: "The state wants a residence in Luckhead, and the governor has let it be known he would look kindly on a town that built him one. It is expensive to raise and expensive to keep, and the schools will never want for a field trip again.",
+    tip: "His goodwill lasts exactly as long as your Conservative Tax policy does. The schools benefit either way." },
+  { pop: 55, title: "A SCENE AND A HOSPITAL", keys: ["hospital", "venue"],
     body: "A Hospital is four times the Clinic in every direction: happiness, approval, staffing, and cost. A Music Venue lifts the town's mood and earns well, but draws crowds, cars, and trouble.",
     tip: "Keep both out of the smog, and the venue away from housing." },
-  { pop: 58, title: "THE GRAND OLD STAGE", keys: ["theatre"],
+  { pop: 59, title: "THE GRAND OLD STAGE", keys: ["theatre"],
     body: "The Luckhead Theatre sells out most nights and lifts the spirits of the whole town. It wants real power and a real staff, and every Music Venue you own loses 15% of its door to it.",
     tip: "Worth it for the mood alone. Your venues will not see it that way." },
-  { pop: 64, title: "UNDERGROUND", keys: ["subway", "stadium"],
+  { pop: 63, title: "WORTH REMEMBERING", keys: ["histcenter"],
+    body: "Luckhead has been around long enough to have a story about itself. A History Center gives the town somewhere to keep it, teaches the young, and quietly tells everyone the place is permanent.",
+    tip: "One only. It earns nothing and it is worth building anyway." },
+  { pop: 67, title: "UNDERGROUND", keys: ["subway", "stadium"],
     body: "Luckhead can dig. Subway Stops clear traffic far harder than buses, near and townwide, but cost real money to run and need a partner stop like any transit.",
     tip: "Two stops minimum. They share the network with your buses." },
-  { pop: 70, title: "THE LAST ADDRESSES", keys: ["hideaway", "plaza"],
+  { pop: 72, title: "THE LAST ADDRESSES", keys: ["hideaway", "plaza"],
     body: "The two landmarks a town only builds when it has arrived. Tommy's Hideaway pours real money and pulls newcomers in by word of mouth, with a little trouble behind it. Pipp's Plaza is the biggest commercial address in Luckhead, and it takes 20% of every shop's trade to be there.",
     tip: "The Plaza will not open without a Police Station beside it." },
 ];
@@ -325,7 +333,7 @@ const MILESTONES = [
 // milestone that introduces it, so availability and the popup are the same event.
 const MILESTONE_POP = {};
 MILESTONES.forEach((m) => (m.keys || []).forEach((k) => { MILESTONE_POP[k] = m.pop; }));
-const CONDUCT = new Set(["line", "plant", "house", "shop", "factory", "police", "tavern", "church", "school", "bus", "venue", "prison", "clinic", "hospital", "speaker", "camera", "bank", "subway", "theatre", "hideaway", "plaza", "library", "histcenter", "stadium", "hall", "hallpart"]);
+const CONDUCT = new Set(["line", "plant", "house", "shop", "factory", "police", "tavern", "church", "school", "bus", "venue", "prison", "clinic", "hospital", "speaker", "camera", "bank", "subway", "theatre", "hideaway", "plaza", "library", "histcenter", "mansion", "stadium", "hall", "hallpart"]);
 const conducts = (cell) => !!cell && (CONDUCT.has(cell.type) || cell.wire === true);
 const isCarriageway = (cell) => !!cell && (cell.type === "road" || cell.type === "bridge");
 const econOf = (t, cell) => {
@@ -427,6 +435,7 @@ const FATIGUE_CAP = 15; // levels off after six terms
 const SUCCESSION_EVERY = 2;
 const ICE_RAID_DAYS = 60;    // how long the streets stay quiet after the raids
 const ICE_RAID_CRIME = 9;    // crime removed while the agents are still working
+const ICE_GROWTH = 0.35;     // what is left of normal arrivals once ICE is invited in
 
 // ---- random events ----
 // One lands every EVENT_EVERY days and runs for its duration. Effects are read
@@ -538,6 +547,7 @@ function approvalRows(S, d, hap) {
   push("Clinics and hospitals", Math.min(8, 1.4 * (d.care || 0)));
   push("Loudspeakers", Math.min(7, 2.2 * (d.message || 0)));
   if (d.fastparkOn) push("Faststain Park", 4);
+  if (d.mansionOn && S.tax === "normal") push("The governor's friendship", 6);
   if (d.monumentCount) push(`Chief memorials (${d.monumentCount})`, Math.min(6, 2 * d.monumentCount));
   if (d.cameras) push(`Cameras watching (${d.cameras})`, -Math.min(5, 0.9 * d.cameras));
   if (S.blackmail === 3 && S.day < (S.blackmailUntil || 0)) push("The Tsuis are talking to reporters", -7);
@@ -598,6 +608,7 @@ function crimeLedgerRows(S, d) {
   if (d.taverns) push(`Taverns (${d.taverns})`, 2 * d.taverns);
   if (d.shops) push(`Shops (${d.shops})`, 0.12 * d.shops);
   if (d.traffic > 0.15) push(`Traffic (${Math.round(d.traffic * 100)}%)`, 2.5 * d.traffic);
+  if (d.highwayOn) push("Interstate access", HIGHWAY_CRIME);
   if (d.stadiumCrime) push("Stadium crowds", d.stadiumCrime);
   if (d.rowdiness) push("Venue crowds", d.rowdiness);
   if (d.smuggling) push(`Smuggling factories (${d.smuggling})`, 2.5 * d.smuggling);
@@ -898,6 +909,13 @@ const GRACE_DAYS = 60;       // a new town gets the benefit of the doubt this lo
 const earlyGrace = (day) => (day >= GRACE_DAYS ? 1 : 0.45 + 0.55 * (day / GRACE_DAYS));
 const ENV_DRIFT = 0.04;      // the environment moves slowly, like a real one
 const ENV_ALARM = 30;        // below this the whole town notices
+// One square on the edge of every map is an interstate off-ramp. Running the
+// town's road network up to it opens Luckhead to through traffic: money moves,
+// and so does everything else that travels a highway.
+const HIGHWAY_TRADE = 1.2;      // shops and factories earn this much more
+const HIGHWAY_TRAFFIC = 1.12;   // and the roads carry this much more
+const HIGHWAY_CRIME = 3;        // crime that arrives with the trucks
+const HIGHWAY_ENV = 4;          // environment given up to the exhaust
 // School coverage mirrors police coverage exactly, same reach-and-strength
 // math, but the targets are houses only and the consequence is happiness, not
 // crime. Gated on the school unlock so a brand new town isn't punished for a
@@ -1024,7 +1042,18 @@ function freshState(seed, diff) {
   });
 
   const DF = diff || DEFAULT_DIFF;
-  return { grid, terrain, seed: useSeed, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, tsuiLoan: 0, tsuiLoanUntil: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
+  // Pick the off-ramp: a dry square somewhere on the rim. The road network has
+  // to be run out to it before any of it means anything.
+  const rim = [];
+  for (let k = 0; k < SIZE; k++) {
+    [[0, k], [SIZE - 1, k], [k, 0], [k, SIZE - 1]].forEach(([r, c]) => {
+      const idx = at0(r, c);
+      if (terrain[idx] !== WATER && rim.indexOf(idx) < 0) rim.push(idx);
+    });
+  }
+  const interstate = rim.length ? rim[Math.floor(rnd() * rim.length)] : -1;
+
+  return { grid, terrain, seed: useSeed, interstate, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, tsuiLoan: 0, tsuiLoanUntil: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
 }
 
 const rc = (i) => [Math.floor(i / SIZE), i % SIZE];
@@ -1082,11 +1111,23 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   roadGroups.forEach((g, k) => { if (g.length > best) { best = g.length; mainRoad = k; } });
   const orphanRoads = roadGroups.reduce((a, g, k) => a + (k === mainRoad ? 0 : g.length), 0);
   const isRoad = (i) => isRoadTile(i) && roadComp[i] === mainRoad;
+  // The ramp counts as connected when the town's main road network reaches it,
+  // either by paving the square itself or by bringing a road up alongside.
+  let highwayOn = false;
+  if (flags.interstate !== undefined && flags.interstate >= 0) {
+    const hi = flags.interstate;
+    const [hr, hc] = rc(hi);
+    highwayOn = isRoad(hi)
+      || [at(hr - 1, hc), at(hr + 1, hc), at(hr, hc - 1), at(hr, hc + 1)]
+           .some((nb) => nb >= 0 && isRoad(nb));
+  }
+  const highwayTrade = highwayOn ? HIGHWAY_TRADE : 1;
+
   const status = {};
   let powerCap = 0, powerDemand = 0, popCap = 0, jobs = 0, upkeep = 0, revenue = 0;
   let billboardMsg = 0;   // accumulated in pass 1; folded into message below
   let upPower = 0, upIndustry = 0, upCivic = 0, goods = 0, smuggling = 0;
-  let guard = null, hallJobs = 0;
+  let guard = null, hallJobs = 0, mansionOn = false;
   let anyDisc = false, anyUnwired = false, anyOverload = false, anyUnstaffed = false, plantBuilt = false, anyBuilding = false;
   const parks = [], houses = [];
 
@@ -1296,7 +1337,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     if (cell.type === "house") { popCap += b.cap; houses.push([r, c]); targets.push([r, c]); }
     if (cell.type === "shop") { jobs += b.jobs; shops.push([i, b.rev || 0, smogPenalty * crew * shopRevMul]); targets.push([r, c]); }
     if (cell.type === "factory") { jobs += b.jobs; upkeep += indUp(b.upkeep); upIndustry += indUp(b.upkeep);
-      goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1)); if (cell.smuggle) smuggling += 1; targets.push([r, c]); }
+      goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1) * highwayTrade); if (cell.smuggle) smuggling += 1; targets.push([r, c]); }
     if (cell.type === "police") { const cu = Math.round(civicCost(b.upkeep) * F.upkeep * (flags.copWage || 1));
       jobs += Math.max(1, b.jobs + F.staff + chiefStaff);
       if (CH && CH.tsuiStations && waivedStations < CH.tsuiStations) waivedStations++;
@@ -1330,6 +1371,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
         schoolCov.push([r, c, b.reach || SCHOOL_REACH, crew]);
       }
     }
+    if (cell.type === "mansion") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu; mansionOn = true; }
     if (cell.type === "library" || cell.type === "histcenter") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu; eduBuff += (b.edu || 0.35) * crew; }
     if (cell.type === "stadium") { jobs += b.jobs; upkeep += indUp(b.upkeep); upIndustry += indUp(b.upkeep);
       revenue += Math.round((b.rev || 0) * smogPenalty * crew * leisure * entRevMul);
@@ -1370,7 +1412,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     .forEach(([i, rev, smogPenalty], k) => {
       // full rate while shops still fit inside the catchment, then taper
       const share = k < supported ? 1 : Math.max(0.15, supported / (k + 1));
-      const earned = Math.round(rev * share * smogPenalty);
+      const earned = Math.round(rev * share * smogPenalty * highwayTrade);
       status[i].demand = share;
       status[i].earned = earned;
       revenue += earned;
@@ -1473,7 +1515,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     jamSum += Math.min(1.5, jam);
   });
   const globalRelief = transit ? Math.min(0.5, buses.reduce((a, b) => a + (b[3] || 0.07), 0)) : 0;
-  let traffic = roadCount ? Math.min(1, (jamSum / roadCount) * (1 - globalRelief) * (EV && EV.traffic ? EV.traffic : 1) * (flags.iceOn ? 1.15 : 1)) : 0;
+  let traffic = roadCount ? Math.min(1, (jamSum / roadCount) * (1 - globalRelief) * (EV && EV.traffic ? EV.traffic : 1) * (flags.iceOn ? 1.15 : 1) * (highwayOn ? HIGHWAY_TRAFFIC : 1)) : 0;
   // Some events do not scale what you had, they simply stop the city.
   if (EV && EV.trafficFloor && roadCount) traffic = Math.max(traffic, EV.trafficFloor);
 
@@ -1528,6 +1570,8 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   // Where the environment is heading. 100 is pristine. Industry drags it down,
   // green space pulls it back, and the doctrine you govern under colours all of
   // it. The bar itself drifts toward this in step() rather than snapping.
+  if (mansionOn) learning *= 1.12;
+
   const envTarget = Math.max(0, Math.min(100,
     100
     - 7 * envStacks * (flags.envDirty || 1)
@@ -1536,6 +1580,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     + 4 * envGreen
     + 1.5 * envTransit
     + (flags.envCleaned ? 8 : 0)
+    - (highwayOn ? HIGHWAY_ENV : 0)
   ));
   return { status, powerCap, powerDemand, popCap, housing: popCap, jobs, upkeep, upPower, upIndustry, upCivic,
            revenue: revenueNet, revenueGross: revenue, traffic, congested, orphanRoads, envAvg, tavernMood,
@@ -1544,6 +1589,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
            copPosts: cops, crimeTargets: targets, hallGuard: guard,
            schoolFrac, schoolCov, houseTargets: houses,
            taverns: taverns.length, stadiumCrime, eduBuff, schoolCount: schools.length, cameras, churchWeight, churchCount: Math.round(churchWeight), loudChurches,
+           highwayOn, mansionOn,
            envTarget, env: flags.env === undefined ? START_ENV : flags.env,
            envStacks, envPlants, envGreen, envTransit,
            protestMood: flags.protestMood || 0, grace: flags.grace === undefined ? 1 : flags.grace, faith };
@@ -1606,7 +1652,7 @@ function step(prev) {
   const CHF = CHIEFS[prev.chiefId] || null;
   const EV = eventById(prev.event);
   const DP = diffOf(prev.diff);
-  const d = derive(prev.grid, Math.floor(prev.pop), prev.tax, prev.fund, prev.terrain, prev.heir, prev.event, { bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
+  const d = derive(prev.grid, Math.floor(prev.pop), prev.tax, prev.fund, prev.terrain, prev.heir, prev.event, { interstate: prev.interstate, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
   const baseHap = calcHap(prev.pop, d, prev.mafia, prev.crime);
   const hap = baseHap + (H ? H.mood : 0) + (CHF ? CHF.mood : 0) + (EV && EV.mood ? EV.mood : 0);
   let pop = prev.pop;
@@ -1616,10 +1662,10 @@ function step(prev) {
     const room = Math.max(0, d.popCap * 1.35 - pop);
     if (room > 0) pop = Math.min(d.popCap * 1.35, pop + Math.min(room, 0.06 * T.growth));
   } else if (pop > d.popCap * 1.35) pop = Math.max(d.popCap * 1.35, pop - 2);
-  else if (hap >= 45 && pop < d.popCap && prev.ice !== 2
+  else if (hap >= 45 && pop < d.popCap
       && (prev.day + 1) >= (prev.shootingUntil || 0)
       && !((prev.tsuiWar || 0) > 0 && (prev.day + 1) < prev.tsuiWar + 40))
-    pop = Math.min(d.popCap, pop + (0.25 + hap / 95) * T.growth * (EV && EV.growth ? EV.growth : 1) * (d.hideawayOn ? 1.12 : 1) * (prev.faithStance === "attend" ? 0.94 : 1) * (1 + Math.min(0.35, 0.06 * d.learning)));
+    pop = Math.min(d.popCap, pop + (0.25 + hap / 95) * T.growth * (EV && EV.growth ? EV.growth : 1) * (d.hideawayOn ? 1.12 : 1) * (prev.faithStance === "attend" ? 0.94 : 1) * (1 + Math.min(0.35, 0.06 * d.learning)) * (prev.ice === 2 ? ICE_GROWTH : 1));
   else if (hap < 28 && pop > 0) pop = Math.max(0, pop - 1);
   const employed = Math.min(Math.floor(pop), d.jobs);
 
@@ -2515,6 +2561,7 @@ export default function Luckhead() {
   const [pickDiff, setPickDiff] = useState(DEFAULT_DIFF);
   const [pickHints, setPickHints] = useState(true);
   const [pickDictator, setPickDictator] = useState(false);
+  const [showHall, setShowHall] = useState(false);
   const lastSave = useRef(0);
 
   // Load a saved city once, on launch. Anything malformed starts fresh.
@@ -2618,7 +2665,7 @@ export default function Luckhead() {
   const F = FUND[st.fund] || FUND.normal;
   const EV = eventById(st.event);
   const ecoCost = diffOf(st.diff).economy.cost;
-  const d = useMemo(() => derive(st.grid, Math.floor(st.pop), st.tax, st.fund, st.terrain, st.heir, st.event, { bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
+  const d = useMemo(() => derive(st.grid, Math.floor(st.pop), st.tax, st.fund, st.terrain, st.heir, st.event, { interstate: st.interstate, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
   const hap = calcHap(st.pop, d, st.mafia, st.crime);
   const fp = Math.floor(st.pop);
   const employed = Math.min(fp, d.jobs);
@@ -3312,6 +3359,19 @@ export default function Luckhead() {
             </>
           );
         })()}
+        {st.interstate === i && (
+          <>
+            <span style={{ position: "absolute", inset: 0, borderRadius: isHall ? 0 : 4,
+              boxShadow: `inset 0 0 0 2px ${d.highwayOn ? C.orange : C.dash}`,
+              background: d.highwayOn ? "rgba(242,118,46,0.18)" : "rgba(216,207,174,0.10)",
+              pointerEvents: "none", zIndex: 3 }} />
+            {!cell && (
+              <span style={{ fontSize: "clamp(8px, 2.8vw, 12px)", opacity: d.highwayOn ? 1 : 0.7 }}>
+                {"\uD83D\uDEE3\uFE0F"}
+              </span>
+            )}
+          </>
+        )}
         {stripes}
         {!cell && ground === WOODS && (
           <span style={{ fontSize: "clamp(9px, 3.2vw, 14px)", opacity: 0.55 }}>🌲</span>
@@ -3489,9 +3549,41 @@ export default function Luckhead() {
             style={{ ...disp, fontSize: 18, textAlign: "center", background: C.orange, color: C.ink, borderRadius: 12, padding: "12px 0", cursor: "pointer", letterSpacing: "0.08em" }}>
             TAKE OFFICE
           </div>
+          <div onClick={() => setShowHall(true)}
+            style={{ ...disp, fontSize: 13, textAlign: "center", color: C.cream, border: `1px solid ${C.line}`,
+                     borderRadius: 11, padding: "9px 0", cursor: "pointer", letterSpacing: "0.08em", marginTop: 8 }}>
+            HALL OF FAME{hiscores.length ? ` (${hiscores.length})` : ""}
+          </div>
           <div style={{ ...mono, fontSize: 9, color: C.dim, textAlign: "center", marginTop: 8 }}>
             All-Medium is the standard game. Winning always takes 51%.
           </div>
+
+          {showHall && (
+            <div onClick={() => setShowHall(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80, padding: 16 }}>
+              <div onClick={(e) => e.stopPropagation()}
+                style={{ width: "min(90vw, 360px)", background: C.panel, border: `1px solid ${C.orange}`, borderRadius: 16, padding: 18 }}>
+                <div style={{ ...mono, fontSize: 10, color: C.orange, letterSpacing: "0.2em", marginBottom: 10 }}>HALL OF FAME</div>
+                {hiscores.length === 0 ? (
+                  <div style={{ ...mono, fontSize: 11, color: C.dim, lineHeight: 1.6 }}>
+                    No runs recorded yet. Finish a game as Mayor and the best five land here.
+                  </div>
+                ) : hiscores.map((h, i) => (
+                  <div key={h.when + "-" + i} style={{ display: "flex", alignItems: "baseline", gap: 8, ...mono, fontSize: 10.5, padding: "3px 4px" }}>
+                    <span style={{ color: C.dim, width: 16 }}>{i + 1}</span>
+                    <span style={{ color: C.cream, ...disp, fontSize: 13, width: 54 }}>{h.total}</span>
+                    <span style={{ color: C.dim, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.title}</span>
+                    <span style={{ color: C.dim }}>{h.diff}</span>
+                  </div>
+                ))}
+                <div style={{ display: "flex", marginTop: 14 }}>
+                  <span style={{ flex: 1 }} />
+                  <span onClick={() => setShowHall(false)}
+                    style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.orange, color: C.ink, borderRadius: 9, padding: "6px 14px" }}>CLOSE</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -5141,7 +5233,7 @@ export default function Luckhead() {
               <p style={{ margin: 0 }}>Go along and the raids will empty your labor force and rattle the whole city. Refuse the President of the United States, and a very different set of federal officials will start reading your files.</p>
             </div>
             <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
-              <span style={{ color: C.amber }}>ALLOW</span> · crime -{ICE_RAID_CRIME} for {ICE_RAID_DAYS} days, then nothing · immigration stops for good · commercial &amp; industrial revenue -15% · traffic up · approval hit<br />
+              <span style={{ color: C.amber }}>ALLOW</span> · crime -{ICE_RAID_CRIME} for {ICE_RAID_DAYS} days, then nothing · immigration slows for good · commercial &amp; industrial revenue -15% · traffic up · approval hit<br />
               <span style={{ color: C.red }}>REFUSE</span> · a federal investigation opens against you
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
@@ -5206,7 +5298,7 @@ export default function Luckhead() {
               <p style={{ margin: 0 }}>Five thousand dollars makes it go away. Refuse, and they will find other ways to keep you busy.</p>
             </div>
             <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
-              <span style={{ color: C.amber }}>PAY $5,000</span> · the photographs disappear<br />
+              <span style={{ color: C.amber }}>PAY $2,000</span> · the photographs disappear<br />
               <span style={{ color: C.red }}>REFUSE</span> · crime climbs hard, and they spend a month smearing you
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
@@ -5218,10 +5310,10 @@ export default function Luckhead() {
               </span>
               <span style={{ flex: 1 }} />
               <span
-                onClick={() => { if (st.money < 5000) { setNote("You do not have $5,000 to give them."); return; } setSt((s) => ({ ...s, blackmail: 2, money: s.money - 5000 })); setToast("🤝 The envelope is collected. The photographs are gone."); setSpeed("play"); }}
-                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: st.money < 5000 ? C.line : C.amber, color: C.ink, borderRadius: 9, padding: "6px 12px" }}
+                onClick={() => { if (st.money < 2000) { setNote("You do not have $2,000 to give them."); return; } setSt((s) => ({ ...s, blackmail: 2, money: s.money - 2000 })); setToast("🤝 The envelope is collected. The photographs are gone."); setSpeed("play"); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: st.money < 2000 ? C.line : C.amber, color: C.ink, borderRadius: 9, padding: "6px 12px" }}
               >
-                PAY $5,000
+                PAY $2,000
               </span>
             </div>
           </div>
