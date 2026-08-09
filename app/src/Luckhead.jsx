@@ -269,34 +269,57 @@ const investedIn = (cell) => {
   for (let k = 0; k < (cell.lv || 0); k++) total += UPGRADES[cell.type][k].cost;
   return Math.round(total * COST_SCALE);
 };
-const BUILD_KEYS = ["road", "bridge", "line", "house", "shop", "factory", "plant", "park", "tavern", "church", "police", "school", "bus", "venue", "clinic", "hospital", "prison", "library", "histcenter", "stadium", "speaker", "billboard", "bank", "subway", "theatre", "hideaway", "plaza", "fastpark"];
-const UNLOCK_DAY = { speaker: 40, billboard: 40, camera: 100, bank: 138 };
+const BUILD_KEYS = ["road", "bridge", "line", "house", "shop", "factory", "plant", "park", "tavern", "church", "police", "camera", "school", "bus", "venue", "clinic", "hospital", "prison", "library", "histcenter", "stadium", "speaker", "billboard", "bank", "subway", "theatre", "hideaway", "plaza", "fastpark"];
+const UNLOCK_DAY = { speaker: 40, billboard: 40, camera: 100, bank: 70 };
+// Day-gated unlocks, announced the same way population ones are. Keep this in
+// ascending day order for the same reason the population list is ordered: the
+// counter walks it front to back.
+const DAY_MILESTONES = [
+  { day: 40, title: "A VOICE FROM ABOVE", keys: ["speaker", "billboard"],
+    body: "A contractor has offered the city a network of civic loudspeakers, and the print shop on Third will run campaign billboards for anyone who pays. Both talk to the town for you. Neither is subtle.",
+    tip: "Keep loudspeakers away from Taverns and Schools. Nobody learns or drinks well over a public address system." },
+  { day: 70, title: "THE BANK OPENS", keys: ["bank"],
+    body: "Luckhead is finally worth a branch. A Bank shaves the cost of everything you build, up to three of them, and a city with one can borrow honestly when the treasury runs dry.",
+    tip: "The alternative to a bank loan is somebody else's money, and that comes with conditions." },
+  { day: 100, title: "EYES ON THE STREET", keys: ["camera"],
+    body: "Street cameras watch a small patch of ground without a single officer on the payroll. They cost power and they cost goodwill, but they never call in sick.",
+    tip: "Weaker than a Police Station and cheaper to staff, which is none. Use them to patch the corners a patrol misses." },
+];
 // Some buildings unlock only after a prerequisite building exists.
 const UNLOCK_AFTER = { library: "school" };
-const UNLOCK = { church: 15, factory: 15, school: 25, clinic: 30, prison: 30, bus: 36, subway: 60, hospital: 50, venue: 50, theatre: 55, hideaway: 55, plaza: 55, fastpark: 55 };
-// Popups fire the first time the town reaches each milestone.
+const UNLOCK = { church: 15, factory: 15, school: 26, clinic: 34, prison: 34, bus: 40, subway: 64, hospital: 52, venue: 52, theatre: 58, hideaway: 70, plaza: 70, fastpark: 46 };
+// Popups fire the first time the town reaches each milestone. Keep this list in
+// ascending population order: the unlock counter walks it front to back and
+// stops at the first entry it has not reached, so an out-of-order threshold is
+// held hostage and then swallows the popup listed before it.
 const MILESTONES = [
   { pop: 15, title: "FAITH AND INDUSTRY", keys: ["church", "factory"],
     body: "Luckhead can support industry and a congregation. Factories export goods for real money but demand a small army of workers and foul the air for two tiles. Churches quiet crime across the whole town.",
     tip: "Keep factories away from housing. Churches work from anywhere." },
-  { pop: 25, title: "SCHOOLS OPEN", keys: ["school"],
+  { pop: 26, title: "SCHOOLS OPEN", keys: ["school"],
     body: "Schools draw families to Luckhead, lift approval, and keep young people out of trouble. They cost real upkeep and need a full staff.",
     tip: "Their pull on newcomers compounds. Build early." },
-  { pop: 30, title: "ORDER AND MEDICINE", keys: ["prison", "clinic"],
+  { pop: 34, title: "ORDER AND MEDICINE", keys: ["prison", "clinic"],
     body: "Two institutions a real town needs. A Prison calms crime across the whole map wherever you put it. A Clinic keeps people well, lifting both happiness and your approval.",
     tip: "Both cost real upkeep. Neither works next to a factory." },
-  { pop: 36, title: "PUBLIC TRANSIT", keys: ["bus"],
+  { pop: 40, title: "PUBLIC TRANSIT", keys: ["bus"],
     body: "Bus Stations shed traffic from every road they touch, and a working network eases congestion across the entire town.",
     tip: "A lone station does nothing. Build at least two." },
-  { pop: 50, title: "A SCENE AND A HOSPITAL", keys: ["hospital", "venue", "histcenter"],
+  { pop: 46, title: "THE PARK, SINGULAR", keys: ["fastpark"],
+    body: "Faststain Park is the first landmark Luckhead can claim. No staff, no power lines, nothing but ground and civic pride. The homes beside it pay a premium in tax, and every other park in town looks a little shabbier from the day it opens.",
+    tip: "It asks for money and space and nothing else. Put it where people live." },
+  { pop: 52, title: "A SCENE AND A HOSPITAL", keys: ["hospital", "venue", "histcenter"],
     body: "A Hospital is four times the Clinic in every direction: happiness, approval, staffing, and cost. A Music Venue lifts the town's mood and earns well, but draws crowds, cars, and trouble.",
     tip: "Keep both out of the smog, and the venue away from housing." },
-  { pop: 60, title: "UNDERGROUND", keys: ["subway", "stadium"],
+  { pop: 58, title: "THE GRAND OLD STAGE", keys: ["theatre"],
+    body: "The Luckhead Theatre sells out most nights and lifts the spirits of the whole town. It wants real power and a real staff, and every Music Venue you own loses 15% of its door to it.",
+    tip: "Worth it for the mood alone. Your venues will not see it that way." },
+  { pop: 64, title: "UNDERGROUND", keys: ["subway", "stadium"],
     body: "Luckhead can dig. Subway Stops clear traffic far harder than buses, near and townwide, but cost real money to run and need a partner stop like any transit.",
     tip: "Two stops minimum. They share the network with your buses." },
-  { pop: 55, title: "LANDMARKS", keys: ["theatre", "hideaway", "plaza", "fastpark"],
-    body: "Luckhead is big enough for institutions now: the Theatre, Tommy's Hideaway, Pipp's Plaza, and Faststain Park. Each is one of a kind, very expensive, and powerful. Each also steps on somebody's toes.",
-    tip: "Read what each one costs the rest of the town before you build it." },
+  { pop: 70, title: "THE LAST ADDRESSES", keys: ["hideaway", "plaza"],
+    body: "The two landmarks a town only builds when it has arrived. Tommy's Hideaway pours real money and pulls newcomers in by word of mouth, with a little trouble behind it. Pipp's Plaza is the biggest commercial address in Luckhead, and it takes 20% of every shop's trade to be there.",
+    tip: "The Plaza will not open without a Police Station beside it." },
 ];
 // The popup, not raw population, gates a building. This map ties each key to the
 // milestone that introduces it, so availability and the popup are the same event.
@@ -335,6 +358,16 @@ const GOV_QUOTES = [
     who: "Calvin Coolidge", src: "The Autobiography of Calvin Coolidge, 1929" },
   { text: "All forms of the state have democracy for their truth, and for that reason are false to the extent that they are not democracy.",
     who: "Karl Marx", src: "Critique of Hegel's Philosophy of Right, 1843" },
+  { text: "I would not vote for the mayor. It's not just because he didn't invite me to dinner, but because on my way into town from the airport there were such enormous potholes.",
+    who: "Fidel Castro", src: "Interview with the New York Times, 1995" },
+  { text: "You never agree with any one candidate 100 percent. I don't agree with myself 100 percent.",
+    who: "Rudy Giuliani", src: "" },
+  { text: "Don't blame the boss. He has enough problems.",
+    who: "Donald Rumsfeld", src: "Rumsfeld's Rules" },
+  { text: "Every anarchist is a baffled dictator.",
+    who: "Benito Mussolini", src: "Attributed" },
+  { text: "When the burdens of the presidency seem unusually heavy, I always remind myself it could be worse. I could be a mayor.",
+    who: "Lyndon B. Johnson", src: "" },
 ];
 
 const FLAVOR = [
@@ -870,10 +903,12 @@ const ENV_ALARM = 30;        // below this the whole town notices
 // crime. Gated on the school unlock so a brand new town isn't punished for a
 // building it cannot legally own yet.
 const SCHOOL_REACH = 3;
-const SCHOOL_UNCOVERED_WEIGHT = 12;   // happiness left on the table at 0% coverage
+const SCHOOL_UNCOVERED_WEIGHT = 8;    // happiness left on the table when schools exist but do not reach
 const CRIME_DRIFT = 0.8;     // how fast the crime bar chases its pressure (tamped slightly)
 const SHOOTING_ODDS = 1 / 150;   // a bad night, roughly this often
-const SHOOTING_WAR = 2.2;        // and more often once the family is at odds with you
+const SHOOTING_WAR = 3.6;        // and far more often once the family is at odds with you
+const SHOOTING_POP = 45;         // a town smaller than this cannot absorb a night like that
+const SHOOTING_POP_WAR = 34;     // except in a feud, when the shooting comes anyway
 const SHOOTING_SHOCK = 20;       // days of frozen immigration and a subdued town
 const PROTEST_MOOD = 20;     // below this the town starts gathering
 const PROTEST_DAYS = 3;      // consecutive days of it before they march
@@ -1538,7 +1573,8 @@ function calcHap(pop, d, mafia, crime) {
   // Nothing to answer for before the building exists: gated on the same
   // unlock that lets a school be built at all, then eased in like the other
   // structural pains while the town is young.
-  const schoolGate = Math.floor(pop) >= UNLOCK.school ? 1 : 0;
+  const hasSchool = (d.schoolCov || []).length > 0;
+  const schoolGate = hasSchool && Math.floor(pop) >= (MILESTONE_POP.school || 26) ? 1 : 0;
   const schoolPain = schoolGate * SCHOOL_UNCOVERED_WEIGHT * (1 - Math.min(1, d.schoolFrac || 0)) * gr;
   let h = 58 + d.envAvg + d.tavernMood + Math.min(10, 1.6 * (d.care || 0)) + (d.protestMood || 0) - unemp * gr - homeless * gr - piety - loudPenalty - envPain - 24 * (d.traffic || 0) - schoolPain;
   if (mafia === "allied") h -= 10;
@@ -1653,9 +1689,11 @@ function step(prev) {
   let shootingDead = prev.shootingDead || 0;
   let shootingsSeen = prev.shootingsSeen || 0;
   if (shooting >= 2 && day >= shootingUntil) shooting = 0;
-  if (prev.chiefId && prev.chiefId !== "mcgurk" && day > CRIME_GRACE && Math.floor(pop) >= 45 && shooting === 0
+  const atWarWithTsui = mafia === "refused" || mafia === "defeated";
+  const shootFloor = atWarWithTsui ? SHOOTING_POP_WAR : SHOOTING_POP;
+  if (prev.chiefId && prev.chiefId !== "mcgurk" && day > CRIME_GRACE && Math.floor(pop) >= shootFloor && shooting === 0
       && day >= shootingUntil) {
-    const feud = (mafia === "refused" || mafia === "defeated") ? SHOOTING_WAR : 1;
+    const feud = atWarWithTsui ? SHOOTING_WAR : 1;
     if (evRoll(113) < SHOOTING_ODDS * feud) {
       // Two to ten, and never more people than the town actually has.
       const toll = Math.min(Math.floor(pop), 2 + Math.floor(evRoll(127) * 9));
@@ -1945,7 +1983,7 @@ function step(prev) {
 
   // Day-gated unlocks announce themselves once.
   let dayUnlocked = prev.dayUnlocked || 0;
-  if (dayUnlocked === 0 && day >= UNLOCK_DAY.speaker) dayUnlocked = 1;
+  while (dayUnlocked < DAY_MILESTONES.length && day >= DAY_MILESTONES[dayUnlocked].day) dayUnlocked += 1;
 
   // Police chief shows up the first time crime maxes out.
   let chief = prev.chief || 0;
@@ -2007,7 +2045,7 @@ function step(prev) {
   const reprisalDue = tsuiWar > 0 && sinceWar === 15 && arsonDay !== day;
   // Otherwise the fires come every couple of weeks, hotter while the war is
   // fresh, and never as a certainty.
-  const warHeat = sinceWar >= 0 && sinceWar <= 60 ? 0.35 : 0.22;
+  const warHeat = sinceWar >= 0 && sinceWar <= 60 ? 0.28 : 0.17;
   const weeklyDue = atOddsWithTsui && day % 14 === 0 && arsonDay !== day
     && evRoll(53) < warHeat;
   if (reprisalDue || weeklyDue) {
@@ -2206,6 +2244,8 @@ const MUSIC_SETS = [
   { main: "main2.mp3", tense: "tense2.mp3", trueLen: 54.909388, loopStart: 0.024059, loopLen: 54.875397 },
   { main: "main3.mp3", tense: "tense3.mp3", trueLen: 45.244082, loopStart: 0.035601, loopLen: 45.186349 },
   { main: "main4.mp3", tense: "tense4.mp3", trueLen: 52.427755, loopStart: 0.007075, loopLen: 52.396236 },
+  { main: "main5.mp3", tense: "tense5.mp3", trueLen: 61.492245, loopStart: 0.005805, loopLen: 61.471247 },
+  { main: "main6.mp3", tense: "tense6.mp3", trueLen: 64.052245, loopStart: 0.034603, loopLen: 64.009796 },
 ];
 // Pick a set index other than the one now playing. With four sets this draws
 // evenly from the other three; the guard also covers the degenerate one-set
@@ -2718,10 +2758,7 @@ export default function Luckhead() {
   }, [st.mafia]);
 
   const dayMilestone = (st.dayUnlocked || 0) > prevDayUnlocked.current && !st.over
-    ? { pop: null, day: UNLOCK_DAY.speaker, title: "A VOICE FROM ABOVE", keys: ["speaker"],
-        body: "A contractor has offered the city a network of civic loudspeakers. Hourly announcements, uplifting music, reminders of who runs this town. Approval rises wherever they reach.",
-        tip: "Keep them away from Taverns and Schools. Nobody learns or drinks well over a public address system." }
-    : null;
+    ? DAY_MILESTONES[(st.dayUnlocked || 0) - 1] : null;
   const newMilestone = dayMilestone || ((st.unlocked || 0) > prevUnlocked.current && !st.over
     ? MILESTONES[(st.unlocked || 0) - 1] : null);
   // A population building is available only after its milestone popup has been
@@ -3147,14 +3184,18 @@ export default function Luckhead() {
     const naked = new Set();
     targs.forEach(([r, c]) => { const k = at0(r, c); if (!strength.has(k)) naked.add(k); });
 
-    const schoolStrength = reachMap(d.schoolCov || []);
-    const houseTargs = d.houseTargets || [];
+    // Nothing about schooling is shown, or counted against the town, until the
+    // town is big enough to build a school. Same threshold the mood penalty
+    // uses, so the lens and the ledger always agree.
+    const schoolsOpen = Math.floor(st.pop) >= (MILESTONE_POP.school || 26);
+    const schoolStrength = schoolsOpen ? reachMap(d.schoolCov || []) : new Map();
+    const houseTargs = schoolsOpen ? (d.houseTargets || []) : [];
     const schoolNaked = new Set();
     houseTargs.forEach(([r, c]) => { const k = at0(r, c); if (!schoolStrength.has(k)) schoolNaked.add(k); });
 
     return { strength, guarded, naked, targets: targs.length,
-             schoolStrength, schoolNaked, houses: houseTargs.length };
-  }, [beat, d.copPosts, d.crimeTargets, d.hallGuard, d.schoolCov, d.houseTargets]);
+             schoolStrength, schoolNaked, houses: houseTargs.length, schoolsOpen };
+  }, [beat, d.copPosts, d.crimeTargets, d.hallGuard, d.schoolCov, d.houseTargets, st.pop]);
 
   const Tile = ({ i }) => {
     const cell = st.grid[i];
@@ -3808,6 +3849,7 @@ export default function Luckhead() {
               police {Math.round((d.policeFrac || 0) * 100)}%
             </span>
           </div>
+          {beatMap.schoolsOpen && (
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <span style={{ width: 9, height: 9, borderRadius: 2, background: C.school, opacity: 0.6 }} />
@@ -3822,6 +3864,7 @@ export default function Luckhead() {
               school {Math.round((d.schoolFrac || 0) * 100)}%
             </span>
           </div>
+          )}
         </div>
       )}
 
@@ -3890,7 +3933,7 @@ export default function Luckhead() {
               <div style={{ borderLeft: `2px solid ${C.green}`, paddingLeft: 12, marginBottom: 14 }}>
                 <div style={{ fontSize: 13, lineHeight: 1.55, color: C.cream, fontStyle: "italic" }}>{q.text}</div>
                 <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 6 }}>{q.who}</div>
-                <div style={{ ...mono, fontSize: 9, color: C.dim, opacity: 0.75 }}>{q.src}</div>
+                {q.src ? <div style={{ ...mono, fontSize: 9, color: C.dim, opacity: 0.75 }}>{q.src}</div> : null}
               </div>
               <div style={{ display: "flex" }}>
                 <span style={{ flex: 1 }} />
