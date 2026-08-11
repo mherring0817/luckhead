@@ -486,14 +486,26 @@ const LAWYER_KEYS = ["nace", "jenkins", "ginsberg"];
 const FED_GRANT_RATE = 10;      // dollars a day at neutral standing in a town of forty
 const FED_FAVOR_MIN = -2, FED_FAVOR_MAX = 2;
 // What each level of presidential regard is worth as a multiple of the rate.
-const FED_FAVOR_MULT = { "-2": 0, "-1": 0.5, "0": 1, "1": 1.5, "2": 2.2 };
-const FED_FAVOR_NAME = { "-2": "cut off", "-1": "reduced", "0": "standard", "1": "favoured", "2": "a personal friend" };
-const fedFavorOf = (st) => Math.max(FED_FAVOR_MIN, Math.min(FED_FAVOR_MAX, st.fedFavor || 0));
+const FED_FAVOR_MULT = { "-2": 0, "-1": 0.5, "0": 1, "1": 1.5, "2": 2.2, "3": 3 };
+const FED_FAVOR_NAME = { "-2": "cut off", "-1": "reduced", "0": "standard", "1": "favoured", "2": "a personal friend", "3": "immune to federal scrutiny" };
+// Hosted, allowed ICE in, let him have Nace. Undo any one and the immunity is
+// gone; it was his patience, not a trophy that stays earned.
+const fedComplete = (st) => st.pvisit === 2 && st.ice === 2 && !!st.lawyerLocked;
+const fedFavorOf = (st) => {
+  const cap = fedComplete(st) ? 3 : FED_FAVOR_MAX;
+  return Math.max(FED_FAVOR_MIN, Math.min(cap, st.fedFavor || 0));
+};
 const fedGrantOf = (st, pop) => {
   if (st.schoolAudit) return 0;   // the education audit stops everything
   const scale = Math.max(0.4, Math.min(3, Math.floor(pop || 0) / 40));
   return Math.round(FED_GRANT_RATE * scale * FED_FAVOR_MULT[String(fedFavorOf(st))]);
 };
+// Nobody stops moving to a town the moment it dips. Between the floor and here
+// arrivals thin out steeply; below the floor the place is emptying anyway.
+const GROWTH_FLOOR = 30;
+const GROWTH_EASY = 45;
+const glumGrowth = (hap) => hap >= GROWTH_EASY ? 1
+  : Math.max(0.12, 0.12 + 0.88 * ((hap - GROWTH_FLOOR) / (GROWTH_EASY - GROWTH_FLOOR)));
 const JUDY_ODDS = 0.006;        // daily chance the campaign finds her
 const JUDY_DAYS = 90;           // how long the goodwill lasts
 const JUDY_APPROVAL = 2;
@@ -757,7 +769,8 @@ function legacyScore(st) {
   // The best the town ever thought of you, not the day they threw you out.
   if (st.peakApproval) add(`Best polling (${st.peakApproval}%)`, (st.peakApproval - 51) * 5);
   // Institutions outlive administrations. Only what is standing and finished counts.
-  const LANDMARKS = ["theatre", "hideaway", "plaza", "fastpark", "mansion", "stadium", "histcenter"];
+  const LANDMARKS_BUILD = ["theatre", "hideaway", "plaza", "fastpark"];
+const LANDMARKS = ["theatre", "hideaway", "plaza", "fastpark", "mansion", "stadium", "histcenter"];
   const monuments = (st.grid || []).filter((c) => c && !c.build && LANDMARKS.indexOf(c.type) >= 0).length;
   if (monuments) add(`Landmarks standing (${monuments})`, monuments * 90);
   if (st.rigged) add(`Elections rigged (${st.rigged})`, -st.rigged * 250);
@@ -1221,7 +1234,7 @@ function freshState(seed, diff) {
     govStage: 0, govRel: 0, govPending: 0, govBacked: 0, govShield: 0, govTrade: 1,
     govAsk: 0, govAskDay: 0, govBuiltDay: 0, govTraffic: 1, churchGov: 1, churchGovUntil: 0, works: "balanced", lawyerId: null, lawyerOffer: 0, lawyerFrom: 0,
     fedFavor: 0, lawyerLocked: 0, potus: 0, judyUntil: 0, judySeen: 0, commsId: null,
-    feud: 0, schoolAudit: 0, sSchool: 0, schoolNotice: 0, staffOffer: 0,
+    feud: 0, schoolAudit: 0, sSchool: 0, schoolNotice: 0, staffOffer: 0, govYes: 0, freeLandmark: 0, everRefused: 0,
     sIdle: 0, sRed: 0, sDisc: 0, sPower: 0, tsuiHush: 0, tsuiBound: 0, tsuiLoan: 0, tsuiLoanUntil: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
 }
 
@@ -1606,6 +1619,10 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   upkeep += roadBill;
   upCivic += roadBill;
 
+  // Never refused, never testified: their people cover the crime spike and
+  // the trail, not the money. One refusal, ever, and this is gone for good.
+  const tsuiLoyal = flags.mafia === "allied" && !flags.everRefused && !flags.testified;
+
   const shopSaturation = shops.length ? shopDemand / shops.length : 1;
 
   // The city attorney is on retainer whether or not anyone is suing this week.
@@ -1801,7 +1818,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
            goods, learning, held, care, message, theatreOn, hideawayOn, plazaOn, fastparkOn, fastparkTax, churchTax, schoolTax, waterTax, bankCount, monumentCount, transit, buses: buses.length, venues: venues.length, rowdiness, smuggling, hallJobs, globalRelief, shops: shops.length, shopSaturation, supported,
            anyDisc, anyUnwired, anyOverload, anyUnstaffed, anyBuilding, plantBuilt, policeFrac,
            copPosts: cops, crimeTargets: targets, hallGuard: guard,
-           schoolFrac, schoolCov, houseTargets: houses,
+           schoolFrac, schoolCov, houseTargets: houses, tsuiLoyal,
            taverns: taverns.length, stadiumCrime, eduBuff, schoolCount: schools.length, cameras, churchWeight, churchCount: Math.round(churchWeight), loudChurches,
            highwayOn, mansionOn,
            envTarget, env: flags.env === undefined ? START_ENV : flags.env,
@@ -1853,12 +1870,13 @@ function growthRows(st, d, hap) {
   const EV = eventById(st.event);
   const CM = COMMS[st.commsId];
   const blocked = [];
-  if (hap < 45) blocked.push("Mood is under 45. Nobody moves to an unhappy town.");
+  if (hap < GROWTH_FLOOR) blocked.push(`Mood is under ${GROWTH_FLOOR}. The town is emptying, not filling.`);
   if (Math.floor(st.pop) >= Math.floor(d.popCap)) blocked.push("Every home is full. Build housing.");
   if (st.day < (st.shootingUntil || 0)) blocked.push("A shooting has frozen arrivals for " + Math.ceil((st.shootingUntil || 0) - st.day) + " more days.");
   if ((st.tsuiWar || 0) > 0 && st.day < st.tsuiWar + 40) blocked.push("The feud with the family has frozen arrivals.");
   const pct = (l, m) => { if (Math.abs(m - 1) >= 0.005) rows.push([l, Math.round((m - 1) * 100)]); };
   rows.push(["Base rate from mood", Math.round((0.22 + hap / 100) * 100) / 100]);
+  pct("An unhappy town", glumGrowth(hap));
   pct(`Tax policy: ${T.name}`, T.growth || 1);
   if (CM) pct(`${CM.name}, communications`, CM.growth || 1);
   if (EV && EV.growth) pct(`Event: ${EV.name}`, EV.growth);
@@ -1935,7 +1953,7 @@ function step(prev) {
   const CHF = CHIEFS[prev.chiefId] || null;
   const EV = eventById(prev.event);
   const DP = diffOf(prev.diff);
-  const d = derive(prev.grid, Math.floor(prev.pop), prev.tax, prev.fund, prev.terrain, prev.heir, prev.event, { interstate: prev.interstate, works: prev.works, govTraffic: prev.govTraffic, lawyerFee: LAWYERS[prev.lawyerId] ? LAWYERS[prev.lawyerId].fee : 0,
+  const d = derive(prev.grid, Math.floor(prev.pop), prev.tax, prev.fund, prev.terrain, prev.heir, prev.event, { interstate: prev.interstate, works: prev.works, govTraffic: prev.govTraffic, mafia: prev.mafia, everRefused: prev.everRefused, testified: prev.testified, lawyerFee: LAWYERS[prev.lawyerId] ? LAWYERS[prev.lawyerId].fee : 0,
       commsFee: COMMS[prev.commsId] ? COMMS[prev.commsId].fee : 0, commsTrade: COMMS[prev.commsId] ? COMMS[prev.commsId].trade : 1,
       commsMood: COMMS[prev.commsId] ? COMMS[prev.commsId].mood : 0,
       chiefFee: CHIEFS[prev.chiefId] ? (CHIEFS[prev.chiefId].salary || 0) : 0, govTrade: prev.govTrade, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
@@ -1948,10 +1966,10 @@ function step(prev) {
     const room = Math.max(0, d.popCap * 1.35 - pop);
     if (room > 0) pop = Math.min(d.popCap * 1.35, pop + Math.min(room, 0.06 * T.growth));
   } else if (pop > d.popCap * 1.35) pop = Math.max(d.popCap * 1.35, pop - 2);
-  else if (hap >= 45 && pop < d.popCap
+  else if (hap >= GROWTH_FLOOR && pop < d.popCap
       && (prev.day + 1) >= (prev.shootingUntil || 0)
       && !((prev.tsuiWar || 0) > 0 && (prev.day + 1) < prev.tsuiWar + 40))
-    pop = Math.min(d.popCap, pop + (0.22 + hap / 100) * (COMMS[prev.commsId] ? COMMS[prev.commsId].growth : 1) * T.growth * (EV && EV.growth ? EV.growth : 1) * (d.hideawayOn ? 1.12 : 1) * (prev.faithStance === "attend" ? 0.94 : 1) * (1 + Math.min(0.35, 0.06 * d.learning)) * (prev.ice === 2 ? ICE_GROWTH : 1));
+    pop = Math.min(d.popCap, pop + (0.22 + hap / 100) * glumGrowth(hap) * (COMMS[prev.commsId] ? COMMS[prev.commsId].growth : 1) * T.growth * (EV && EV.growth ? EV.growth : 1) * (d.hideawayOn ? 1.12 : 1) * (prev.faithStance === "attend" ? 0.94 : 1) * (1 + Math.min(0.35, 0.06 * d.learning)) * (prev.ice === 2 ? ICE_GROWTH : 1));
   else if (hap < 28 && pop > 0) pop = Math.max(0, pop - 1);
   const employed = Math.min(Math.floor(pop), d.jobs);
 
@@ -2054,6 +2072,7 @@ function step(prev) {
     // committed law-and-order town can hold the line indefinitely.
     // A governor who has taken your side makes the state's cooperation slower
     // and the paperwork heavier. It never closes the file.
+    if (fedComplete(prev) && (prev.fedFavor || 0) >= 3) { heat = 0; fed = 0; }
     const settled = prev.lawyerId && day >= (prev.lawyerFrom || 0) + LAWYER_HANDOVER;
     const shield = (prev.govShield ? 0.6 : 1) * (settled ? LAWYERS[prev.lawyerId].heat : 1);
     const exposure = (0.32 * ties + crime / 90) * DP.crime.heat * (prev.viral === 1 ? 1.4 : 1) * shield;
@@ -3046,7 +3065,7 @@ export default function Luckhead() {
   const F = FUND[st.fund] || FUND.normal;
   const EV = eventById(st.event);
   const ecoCost = diffOf(st.diff).economy.cost;
-  const d = useMemo(() => derive(st.grid, Math.floor(st.pop), st.tax, st.fund, st.terrain, st.heir, st.event, { interstate: st.interstate, works: st.works, govTraffic: st.govTraffic, lawyerFee: LAWYERS[st.lawyerId] ? LAWYERS[st.lawyerId].fee : 0,
+  const d = useMemo(() => derive(st.grid, Math.floor(st.pop), st.tax, st.fund, st.terrain, st.heir, st.event, { interstate: st.interstate, works: st.works, govTraffic: st.govTraffic, mafia: st.mafia, everRefused: st.everRefused, testified: st.testified, lawyerFee: LAWYERS[st.lawyerId] ? LAWYERS[st.lawyerId].fee : 0,
       commsFee: COMMS[st.commsId] ? COMMS[st.commsId].fee : 0, commsTrade: COMMS[st.commsId] ? COMMS[st.commsId].trade : 1,
       commsMood: COMMS[st.commsId] ? COMMS[st.commsId].mood : 0,
       chiefFee: CHIEFS[st.chiefId] ? (CHIEFS[st.chiefId].salary || 0) : 0, govTrade: st.govTrade, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
@@ -3582,8 +3601,9 @@ export default function Luckhead() {
       setNote(`Luckhead will not support more than ${BUILD_CAP[tool]} ${BUILD[tool].name}s.`);
       return;
     }
+    const usesLandmarkCredit = st.freeLandmark && LANDMARKS_BUILD.includes(tool);
     const clearing = ground === WOODS ? CLEAR_COST : 0;
-    const price = costOf(tool, st.tax, d.bankCount, st.loans, ecoCost) + clearing;
+    const price = usesLandmarkCredit ? 0 : costOf(tool, st.tax, d.bankCount, st.loans, ecoCost) + clearing;
     if (st.money < price) {
       setNote(clearing
         ? `Not enough funds. ${b.name} costs $${costOf(tool, st.tax, d.bankCount, st.loans, ecoCost)} plus $${clearing} to clear the trees.`
@@ -3599,8 +3619,10 @@ export default function Luckhead() {
       // A felled stand of trees is a direct hit, not something the slow drift
       // toward a target would ever register on its own.
       const env = clearing ? Math.max(0, (s.env === undefined ? START_ENV : s.env) - 5) : s.env;
-      return { ...s, grid, env, money: s.money - price, seq: s.seq + 1 };
+      return { ...s, grid, env, money: s.money - price, seq: s.seq + 1,
+               freeLandmark: usesLandmarkCredit ? 0 : s.freeLandmark };
     });
+    if (usesLandmarkCredit) setToast("\uD83C\uDFDB\uFE0F The statehouse pays for it, as promised.");
     setNote(null);
   };
 
@@ -4556,7 +4578,7 @@ export default function Luckhead() {
                 {canRig && (
                   <span
                     onClick={() => {
-                      setSt((s) => ({ ...s, approval: Math.min(100, s.approval + 12), crime: Math.min(100, s.crime + 8), rigged: s.rigged + 1 }));
+                      setSt((s) => ({ ...s, approval: Math.min(100, s.approval + 12), crime: Math.min(100, s.crime + (d.tsuiLoyal ? 0 : 8)), rigged: s.rigged + (d.tsuiLoyal ? 0 : 1) }));
                       setToast("🗳️ The count will be favorable. Nobody has to know.");
                       dismiss();
                     }}
@@ -4677,7 +4699,7 @@ export default function Luckhead() {
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <span
-                onClick={() => { setSt((s) => ({ ...s, mafia: "refused", crime: 15, justBroke: true })); setToast("🚨 Vincent didn't take it well. Build up your police."); setSpeed("play"); }}
+                onClick={() => { setSt((s) => ({ ...s, mafia: "refused", everRefused: 1, crime: 15, justBroke: true })); setToast("🚨 Vincent didn't take it well. Build up your police."); setSpeed("play"); }}
                 style={{ ...disp, cursor: "pointer", fontSize: 13, color: C.red, border: `1px solid ${C.red}`, borderRadius: 9, padding: "6px 12px" }}
               >
                 REFUSE
@@ -4741,7 +4763,7 @@ export default function Luckhead() {
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <span
-                onClick={() => { setSt((s) => ({ ...s, mafia: "refused", crime: 30, heat: Math.max(0, s.heat * 0.45), justBroke: true })); setToast("🚨 The deal is off. Vincent is not sentimental, but the Bureau is interested."); setSpeed("play"); }}
+                onClick={() => { setSt((s) => ({ ...s, mafia: "refused", everRefused: 1, crime: 30, heat: Math.max(0, s.heat * 0.45), justBroke: true })); setToast("🚨 The deal is off. Vincent is not sentimental, but the Bureau is interested."); setSpeed("play"); }}
                 style={{ ...disp, cursor: "pointer", fontSize: 12.5, color: C.red, border: `1px solid ${C.red}`, borderRadius: 9, padding: "6px 10px" }}
               >
                 WALK AWAY
@@ -4827,7 +4849,7 @@ export default function Luckhead() {
                   const envNow = Math.round(st.env === undefined ? 100 : st.env);
                   const g = growthRows(st, d, hap);
                   const arrivals = g.blocked.length ? 0
-                    : (0.22 + hap / 100) * (TAX[st.tax] || TAX.normal).growth
+                    : (0.22 + hap / 100) * glumGrowth(hap) * (TAX[st.tax] || TAX.normal).growth
                       * (COMMS[st.commsId] ? COMMS[st.commsId].growth : 1)
                       * (d.hideawayOn ? 1.12 : 1) * (st.faithStance === "attend" ? 0.94 : 1)
                       * (1 + Math.min(0.35, 0.06 * (d.learning || 0))) * (st.ice === 2 ? ICE_GROWTH : 1);
@@ -5272,7 +5294,7 @@ export default function Luckhead() {
               </span>
               <span style={{ flex: 1 }} />
               <span
-                onClick={() => { setSt((s) => ({ ...s, pvisit: 2, heat: Math.max(0, s.heat - 45), fedFavor: Math.min(FED_FAVOR_MAX, (s.fedFavor || 0) + 1) })); setToast("🇺🇸 Motorcade, handshake, front page. The file goes quiet."); setSpeed("play"); }}
+                onClick={() => { setSt((s) => { const cap = fedComplete({ ...s, pvisit: 2 }) ? 3 : FED_FAVOR_MAX; return { ...s, pvisit: 2, heat: Math.max(0, s.heat - 45), fedFavor: Math.min(cap, (s.fedFavor || 0) + 1) }; }); setToast("🇺🇸 Motorcade, handshake, front page. The file goes quiet."); setSpeed("play"); }}
                 style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: C.cream, color: C.ink, borderRadius: 9, padding: "6px 12px" }}
               >
                 HOST THE PRESIDENT
@@ -5830,9 +5852,10 @@ export default function Luckhead() {
                 <span onClick={() => {
                     setSt((s) => {
                       const grid = s.grid.map((c) => (c && c.smuggle ? { ...c, smuggle: false } : c));
+                      const cap = fedComplete({ ...s, lawyerLocked: 1 }) ? 3 : FED_FAVOR_MAX;
                       return { ...s, potus: 2, lawyerId: "nace", lawyerFrom: s.day, lawyerLocked: 1,
                                grid, fed: 0, heat: 0, rigged: 0, backroom: false, smuggleOffer: 0,
-                               investTook: 0, tsuiBound: 0, fedFavor: Math.min(FED_FAVOR_MAX, (s.fedFavor || 0) + 1),
+                               investTook: 0, tsuiBound: 0, fedFavor: Math.min(cap, (s.fedFavor || 0) + 1),
                                modalGap: s.day + MODAL_GAP };
                     });
                     setToast("\uD83C\uDDFA\uD83C\uDDF8 Nancy Nace is sworn in. The file is gone by dinner.");
@@ -6010,7 +6033,13 @@ export default function Luckhead() {
                     style={btn("transparent", C.cream)}>{A.no.label}</span>
                   <span onClick={() => {
                       if (!canPay) { setNote("Luckhead cannot afford to host it."); return; }
-                      const p = A.yes.patch(st); close(p, A.yes.toast);
+                      const p = A.yes.patch(st);
+                      const yesNow = (st.govYes || 0) + 1;
+                      p.govYes = yesNow;
+                      const earned = yesNow === ASKS.length;
+                      if (earned) p.freeLandmark = 1;
+                      close(p, earned ? "\uD83C\uDFDB\uFE0F The statehouse will cover Luckhead's next landmark in full. Build it whenever you like."
+                                       : A.yes.toast);
                     }}
                     style={btn(canPay ? C.green : C.line, canPay ? C.ink : C.dim)}>{A.yes.label}</span>
                 </div>
@@ -6570,6 +6599,7 @@ export default function Luckhead() {
         if (st.potus === 2 && st.lawyerLocked) fedLines.push(["You appointed his choice of attorney", 1]);
         if (st.fed === 1) fedLines.push(["The Bureau has a file open on you", -1]);
         if (st.fed === 2) fedLines.push(["You have been indicted", -1]);
+        if (fedComplete(st) && (st.fedFavor || 0) >= 3) fedLines.push(["No federal exposure reaches you while this holds", 1]);
 
         const govLines = [];
         if (st.govAsk === 0) govLines.push(["He has not written yet", 0]);
@@ -6584,6 +6614,8 @@ export default function Luckhead() {
         if (d.mansionOn && st.tax === "normal") govLines.push(["Mansion standing, Conservative Tax", 1]);
         else if (d.mansionOn) govLines.push(["Mansion standing, but your tax policy is not his", 0]);
         if (st.govBacked) govLines.push(["He is funding your opponent", -1]);
+        if (st.freeLandmark) govLines.push(["He is covering your next landmark in full", 1]);
+        else if ((st.govYes || 0) > 0 && (st.govYes || 0) < 3) govLines.push([`${st.govYes} of 3 favours done for him`, 0]);
 
         const tsuiLines = [];
         if (st.mafia === "none") tsuiLines.push(["No arrangement either way", 0]);
@@ -6595,6 +6627,7 @@ export default function Luckhead() {
         if (st.testified) tsuiLines.push(["You testified against them", 1]);
         if (st.blackmail === 3) tsuiLines.push(["They are talking to reporters", -1]);
         if (st.deal > 0) tsuiLines.push([`${st.deal} renegotiation${st.deal === 1 ? "" : "s"}`, 0]);
+        if (d.tsuiLoyal) tsuiLines.push(["Unbroken loyalty. Elections rig free of the usual cost", 1]);
 
         const powers = [
           { who: "WASHINGTON", sub: "The President",
