@@ -89,8 +89,8 @@ const BUILD = {
   bridge:  { name: "Bridge",      cost: 60,  icon: "🌉", hint: "A road across water. Carries 60% of a road, so crossings jam first." },
   line:    { name: "Power Line",  cost: 5,   icon: "🗼", hint: "Carries power. Can cross roads without blocking them." },
   house:   { name: "House",       cost: 50,  icon: "🏠", pow: 1, cap: 4, hint: "Homes 4 residents and pays tax. Upgrades raise capacity to 7, 12, then 18." },
-  shop:    { name: "Shop",        cost: 75,  icon: "🏪", pow: 1, jobs: 3, rev: 8, hint: "Trade income, 3 jobs. Earns most when there is 1 shop per 10 residents." },
-  factory: { name: "Factory",     cost: 340, icon: "🏭", pow: 2, jobs: 10, upkeep: 5, rev: 28, pollute: true, hint: "Big industrial income, 10 jobs. Pollutes 2 tiles hard. Takes 9 days to build." },
+  shop:    { name: "Shop",        cost: 75,  icon: "🏪", pow: 1, jobs: 3, rev: 7, hint: "Trade income, 3 jobs. Earns most when there is 1 shop per 10 residents." },
+  factory: { name: "Factory",     cost: 340, icon: "🏭", pow: 2, jobs: 10, upkeep: 5, rev: 25, pollute: true, hint: "Big industrial income, 10 jobs. Pollutes 2 tiles hard. Takes 9 days to build." },
   plant:   { name: "Power Plant", cost: 260, icon: "⚡", gen: 10, jobs: 1, upkeep: 12, pollute: true, hint: "Powers 10 units across its wires. Needs 1 operator. Pollutes 2 tiles; keeps running while upgrading." },
   park:    { name: "Park",        cost: 40,  icon: "🌳", upkeep: 1, hint: "Lifts mood for homes within 2 tiles. No road, power, or staff needed." },
   tavern:  { name: "Tavern",      cost: 90,  icon: "🍺", pow: 1, jobs: 2, rev: 6, hint: "Cheer townwide, but +2 crime and adjacent homes lose 9 mood." },
@@ -123,7 +123,7 @@ const BUILD = {
     hint: "+5% industrial and commercial revenue, -4% build costs, -5% bribe cost. Stacks to 3." },
   clinic:  { name: "Clinic",      cost: 150, icon: "🩺", pow: 1, jobs: 2, upkeep: 7, care: 1, hint: "+1 care: happiness and approval. A quarter of a Hospital at a third the cost." },
   hospital:{ name: "Hospital",    cost: 420, icon: "🏥", pow: 3, jobs: 8, upkeep: 26, care: 4, hint: "Serious medicine. Lifts the whole town's health and its opinion of you." },
-  prison:  { name: "Prison",      cost: 260, icon: "🏛", pow: 2, jobs: 4, upkeep: 13, hold: 4, gloom: 7, hint: "Calms crime townwide (-4/day). Homes within 2 tiles lose 7 mood." },
+  prison:  { name: "Prison",      cost: 260, icon: "🏛", pow: 2, jobs: 4, upkeep: 13, hold: 2.6, gloom: 7, hint: "Calms crime townwide. Homes within 2 tiles lose 7 mood, and the grounds cost the town clean air." },
   venue:   { name: "Music Venue", cost: 180, icon: "🎸", pow: 2, jobs: 5, upkeep: 4, rev: 18, cheer: 6, rowdy: 2.5, trips: 26, hint: "Cheer and good money, but heavy traffic, +2.5 crime, and homes within 2 tiles lose mood to the noise." },
   subway:  { name: "Subway Stop",  cost: 260, icon: "🚇", pow: 2, jobs: 2, upkeep: 14, relief: 0.85,
     hint: "Cuts traffic hard on nearby roads and townwide. Needs a partner stop, like buses." },
@@ -242,7 +242,7 @@ const DEBT_FLOOR = -3000;    // past this the state takes the city off your hand
 const MODAL_GAP = 7;         // quiet days after something that could end the run
 const MODAL_GAP_SOFT = 17;   // and a longer breather after routine business
 // Interruptions that genuinely cannot wait. Everything else is business.
-const URGENT_MODALS = new Set(["heir", "vote", "fed", "indict", "chief", "arson", "shooting", "tsuiloan", "hush", "potus"]);
+const URGENT_MODALS = new Set(["heir", "vote", "fed", "indict", "chief", "arson", "shooting", "tsuiloan", "hush", "potus", "audit"]);
 const costOf = (t, taxKey, banks = 0, loans = 0, costMul = 1) => {
   const base = Math.round(BUILD[t].cost * COST_SCALE * costMul * (1 + LOAN_PENALTY * (loans || 0)) * (1 - 0.04 * Math.min(3, banks)));
   const T = TAX[taxKey] || TAX.normal;
@@ -403,6 +403,7 @@ const TSUI_LOAN_DAYS = 90;       // how long the force stays gutted afterward
 const GOV_ASK_DAY = 55;             // when the statehouse first writes
 const GOV_DEADLINE = 120;           // how long he waits for a residence before giving up
 const GOV_BEAT_GAP = 90;            // days between his letters once the house is standing
+const GOV_BREAKFAST_DAYS = 90;      // how long the prayer breakfast moves the congregations
 const GOV_GRAFT_PER_DOUBT = 2500;   // dollars of graft that cost one point of standing
 const GOV_BACKING_DRAG = 3;         // extra daily approval bleed once he funds your rival
 const MAFIA_POP = 30;
@@ -483,12 +484,33 @@ const FED_FAVOR_MULT = { "-2": 0, "-1": 0.5, "0": 1, "1": 1.5, "2": 2.2 };
 const FED_FAVOR_NAME = { "-2": "cut off", "-1": "reduced", "0": "standard", "1": "favoured", "2": "a personal friend" };
 const fedFavorOf = (st) => Math.max(FED_FAVOR_MIN, Math.min(FED_FAVOR_MAX, st.fedFavor || 0));
 const fedGrantOf = (st, pop) => {
+  if (st.schoolAudit) return 0;   // the education audit stops everything
   const scale = Math.max(0.4, Math.min(3, Math.floor(pop || 0) / 40));
   return Math.round(FED_GRANT_RATE * scale * FED_FAVOR_MULT[String(fedFavorOf(st))]);
 };
 const JUDY_ODDS = 0.006;        // daily chance the campaign finds her
 const JUDY_DAYS = 90;           // how long the goodwill lasts
 const JUDY_APPROVAL = 2;
+const FEUD_ODDS = 0.005;        // daily chance the two of them go public
+const SCHOOL_AUDIT_FRAC = 0.85; // coverage the audit expects
+const SCHOOL_AUDIT_DAYS = 30;   // days below it before Washington acts
+const STAFF_OFFER_DAY = 35;     // when City Hall points out the empty desks
+const COMMS_SIGNING = 30;       // signing fee, in days of the new director's rate
+const COMMS = {
+  krauthammer: { name: "Marla Krauthammer", icon: "\uD83D\uDCBC", fee: 12,
+    line: "Twenty years of corporate PR. Knows which numbers a board wants to hear.",
+    trade: 1.1, growth: 1, mood: 0, approval: 0,
+    effects: ["Commercial and industrial revenue +10%", "$12 a day"] },
+  klein: { name: "Ross Klein", icon: "\uD83D\uDCF1", fee: 8,
+    line: "Young, quick, and never off his phone. People move to towns they have heard of.",
+    trade: 1, growth: 1.18, mood: 4, approval: 0,
+    effects: ["Newcomers arrive 18% faster", "+4 town mood", "$8 a day"] },
+  stoneman: { name: "Richard Stoneman", icon: "\uD83C\uDFAC", fee: 10,
+    line: "Managed actors for thirty years. Will make you look good on camera and says so.",
+    trade: 1, growth: 1, mood: 0, approval: 3,
+    effects: ["+3 approval", "$10 a day"] },
+};
+const COMMS_KEYS = ["krauthammer", "klein", "stoneman"];
 const LAWYER_SIGNING = 45;      // the signing fee, in days of the new attorney's rate
 const LAWYER_HANDOVER = 15;     // days before new counsel is any use on a live file
 const HONEYMOON = 20;   // goodwill during the first term, fading after
@@ -513,20 +535,20 @@ const ICE_GROWTH = 0.35;     // what is left of normal arrivals once ICE is invi
 // whole department into a 15-day shakeup at half effectiveness.
 const CHIEF_SHAKE_DAYS = 15;
 const CHIEFS = {
-  jenkins: { name: "Leroy Jenkins", icon: "🤝",
+  jenkins: { name: "Leroy Jenkins", icon: "🤝", salary: 6,
     line: "Came up through the neighborhoods, knows everyone, owes most of them.",
     staff: +2, police: 1, entRev: 1, mood: 0, approval: -2, crime: 3, tsuiStations: 2,
     crimeLabel: "Chief Jenkins, looking the other way",
-    effects: ["Tsui family covers 2 stations' upkeep", "+2 staff needed at every Station and Prison", "+3 crime", "-2 approval", "Counts as a federal entanglement"] },
-  mcgurk: { name: "Dirk McGurk", icon: "🔨",
+    effects: ["Tsui family covers 2 stations' upkeep", "+2 staff needed at every Station and Prison", "+3 crime", "-2 approval", "Counts as a federal entanglement", "$6 a day"] },
+  mcgurk: { name: "Dirk McGurk", icon: "🔨", salary: 15,
     line: "Kicks doors first. The doors have stopped complaining.",
     staff: 0, police: 1.15, entRev: 0.9, mood: 0, approval: -4, crime: 0,
-    effects: ["Police and Prisons 15% harder on crime", "Venues and Taverns earn 10% less", "-4 approval"] },
-  quietmilk: { name: "Charles Quietmilk", icon: "🕊️",
+    effects: ["Police and Prisons 15% harder on crime", "Venues and Taverns earn 10% less", "-4 approval", "$15 a day"] },
+  quietmilk: { name: "Charles Quietmilk", icon: "🕊️", salary: 10,
     line: "Believes in second chances, block parties, and a light touch.",
     staff: -1, police: 1, entRev: 1.1, mood: +2, approval: 0, crime: 2.5,
     crimeLabel: "Chief Quietmilk, community first",
-    effects: ["1 fewer staff at every Station and Prison", "Venues and Taverns earn 10% more", "+2 happiness", "+2.5 crime"] },
+    effects: ["1 fewer staff at every Station and Prison", "Venues and Taverns earn 10% more", "+2 happiness", "+2.5 crime", "$10 a day"] },
 };
 
 // ---- election challengers ----
@@ -609,6 +631,8 @@ function approvalRows(S, d, hap) {
   const LW = LAWYERS[S.lawyerId];
   if (LW && LW.approval) push(`${LW.name}, city attorney`, LW.approval);
   if (S.day < (S.judyUntil || 0)) push("Judy Ginsberg is a sensation", JUDY_APPROVAL);
+  const CD = COMMS[S.commsId];
+  if (CD && CD.approval) push(`${CD.name}, communications`, CD.approval);
   if (H) push(`Doctrine: ${H.name}`, H.approval);
   if (CHF) push(`Chief ${CHF.name.split(" ").pop()}`, CHF.approval);
   if (EV && EV.approval) push(`Event: ${EV.name}`, EV.approval);
@@ -616,14 +640,14 @@ function approvalRows(S, d, hap) {
   push("Clinics and hospitals", Math.min(8, 1.4 * (d.care || 0)));
   push("Loudspeakers", Math.min(7, 2.2 * (d.message || 0)));
   if (d.fastparkOn) push("Faststain Park", 4);
-  if (d.mansionOn && S.tax === "normal") push("Governor Sanders's friendship", 6);
+  if (d.mansionOn && S.tax === "normal") push("Governor Sanders's friendship", 3);
   // Standing with the statehouse, less whatever the family has paid you. He
   // hears things.
   const LWG = LAWYERS[S.lawyerId];
   const heardGraft = (S.graft || 0) * (LWG && LWG.graftShield ? 0 : 1);
   const govStanding = (S.govRel || 0) - Math.floor(heardGraft / GOV_GRAFT_PER_DOUBT)
     + (LWG ? LWG.gov : 0);
-  if (govStanding >= 2) push("The statehouse is friendly", 4);
+  if (govStanding >= 2) push("The statehouse is friendly", 2);
   else if (govStanding <= -2) push("The statehouse is hostile", -5);
   if (S.govBacked && !S.tsuiBound) push("Sanders funds your rival", -GOV_BACKING_DRAG);
   if (S.tsuiBound && !(LAWYERS[S.lawyerId] || {}).tsuiCover) push("The arrangement holds", -2);
@@ -715,21 +739,21 @@ function crimeLedgerRows(S, d) {
 function legacyScore(st) {
   const items = [];
   const add = (label, val) => items.push([label, Math.round(val)]);
-  add(`Days in office (${st.day})`, st.day);
-  if (st.elected) add(`Terms won (${st.elected})`, st.elected * 800);
-  add(`Peak population (${st.peakPop || 0})`, (st.peakPop || 0) * 12);
-  if (st.money > 0) add(`Treasury left behind ($${st.money})`, st.money * 0.2);
-  if (st.money < 0) add(`Debt left behind ($${Math.abs(st.money)})`, st.money * 0.35);
-  if (st.heirCount) add(`Successors named (${st.heirCount})`, st.heirCount * 400);
+  add(`Days in office (${st.day})`, st.day * 0.6);
+  if (st.elected) add(`Terms won (${st.elected})`, st.elected * 600);
+  add(`Peak population (${st.peakPop || 0})`, (st.peakPop || 0) * 8);
+  if (st.money > 0) add(`Treasury left behind ($${st.money})`, st.money * 0.12);
+  if (st.money < 0) add(`Debt left behind ($${Math.abs(st.money)})`, st.money * 0.45);
+  if (st.heirCount) add(`Successors named (${st.heirCount})`, st.heirCount * 300);
   // The air you leave behind. Fifty is neutral ground: cleaner earns, dirtier costs.
   const envEnd = Math.round(st.env === undefined ? START_ENV : st.env);
-  if (envEnd !== 50) add(`Environment left at ${envEnd}`, (envEnd - 50) * 7);
+  if (envEnd !== 50) add(`Environment left at ${envEnd}`, (envEnd - 50) * 4);
   // The best the town ever thought of you, not the day they threw you out.
-  if (st.peakApproval) add(`Best polling (${st.peakApproval}%)`, (st.peakApproval - 51) * 9);
+  if (st.peakApproval) add(`Best polling (${st.peakApproval}%)`, (st.peakApproval - 51) * 5);
   // Institutions outlive administrations. Only what is standing and finished counts.
   const LANDMARKS = ["theatre", "hideaway", "plaza", "fastpark", "mansion", "stadium", "histcenter"];
   const monuments = (st.grid || []).filter((c) => c && !c.build && LANDMARKS.indexOf(c.type) >= 0).length;
-  if (monuments) add(`Landmarks standing (${monuments})`, monuments * 150);
+  if (monuments) add(`Landmarks standing (${monuments})`, monuments * 90);
   if (st.rigged) add(`Elections rigged (${st.rigged})`, -st.rigged * 250);
   if (st.graft) add(`Tsui money pocketed ($${st.graft})`, -st.graft * GRAFT_PENALTY);
   if (st.testified) add(`Testified against the family (${st.testifiedTies || 1} arrangement${(st.testifiedTies || 1) === 1 ? "" : "s"} confessed)`, -220 - (st.testifiedTies || 1) * 160);
@@ -988,7 +1012,7 @@ const copFlags = (st) => ({
 });
 // Refusing the interfaith council, or refusing their curriculum, both bite.
 const faithFlags = (st) => ({
-  churchMul: st.faithStance === "refuse" ? 0.7 : 1,
+  churchMul: (st.faithStance === "refuse" ? 0.7 : 1) * (st.day < (st.churchGovUntil || 0) ? (st.churchGov || 1) : 1),
   doctrineSchools: st.doctrine === 3 ? 0.6 : 1,
 });
 const strikeFlags = (st) => ({
@@ -1185,8 +1209,9 @@ function freshState(seed, diff) {
 
   return { grid, terrain, seed: useSeed, interstate, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, scored: 0, peakApproval: 0,
     govStage: 0, govRel: 0, govPending: 0, govBacked: 0, govShield: 0, govTrade: 1,
-    govAsk: 0, govAskDay: 0, govBuiltDay: 0, works: "balanced", lawyerId: null, lawyerOffer: 0, lawyerFrom: 0,
-    fedFavor: 0, lawyerLocked: 0, potus: 0, judyUntil: 0, judySeen: 0,
+    govAsk: 0, govAskDay: 0, govBuiltDay: 0, govTraffic: 1, churchGov: 1, churchGovUntil: 0, works: "balanced", lawyerId: null, lawyerOffer: 0, lawyerFrom: 0,
+    fedFavor: 0, lawyerLocked: 0, potus: 0, judyUntil: 0, judySeen: 0, commsId: null,
+    feud: 0, schoolAudit: 0, sSchool: 0, schoolNotice: 0, staffOffer: 0,
     sIdle: 0, sRed: 0, sDisc: 0, sPower: 0, tsuiHush: 0, tsuiBound: 0, tsuiLoan: 0, tsuiLoanUntil: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
 }
 
@@ -1200,6 +1225,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   // What the city does to the air and water. Industry is the weight; green
   // space and transit are the counterweight.
   const envStacks = grid.filter((c) => c && c.type === "factory" && !c.build).length;
+  const envPrisons = grid.filter((c) => c && c.type === "prison" && !c.build).length;
   const envPlants = grid.filter((c) => c && c.type === "plant" && !c.build
     && (c.lv || 0) < maxLevel("plant")).length;          // a fully upgraded plant runs clean
   const envGreen = grid.filter((c) => c && !c.build
@@ -1473,7 +1499,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     if (cell.type === "house") { popCap += b.cap; houses.push([r, c]); targets.push([r, c]); }
     if (cell.type === "shop") { jobs += b.jobs; shops.push([i, b.rev || 0, smogPenalty * crew * shopRevMul]); targets.push([r, c]); }
     if (cell.type === "factory") { jobs += b.jobs; upkeep += indUp(b.upkeep); upIndustry += indUp(b.upkeep);
-      goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1) * highwayTrade); if (cell.smuggle) smuggling += 1;
+      goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1) * highwayTrade * (flags.commsTrade || 1)); if (cell.smuggle) smuggling += 1;
       factories.push([r, c, indUp(b.upkeep)]); targets.push([r, c]); }
     if (cell.type === "police") { const cu = Math.round(civicCost(b.upkeep) * F.upkeep * (flags.copWage || 1));
       jobs += Math.max(1, b.jobs + F.staff + chiefStaff);
@@ -1491,7 +1517,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
       // church goes dark rather than merely discounted, like a tavern is.
       const silenced = noiseAt(r, c) > 0;
       if (!silenced) {
-        faith += (b.faith || 2) * crew * (flags.faithStance === "attend" ? 1.25 : 1) * (flags.churchMul || 1);
+        faith += (b.faith || 2) * 0.65 * crew * (flags.faithStance === "attend" ? 1.25 : 1) * (flags.churchMul || 1);
         churchWeight += crew;
       } else {
         loudChurches += 1;
@@ -1556,7 +1582,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
       const near = ([ar, ac]) => Math.abs(ar - sr) + Math.abs(ac - sc);
       const mates = Math.min(3, shopAt.filter((p) => p[0] !== sr || p[1] !== sc).filter((p) => near(p) <= 2).length);
       const custom = Math.min(4, houses.filter((p) => near(p) <= 2).length);
-      const district = (1 + 0.06 * mates + 0.05 * custom) * (flags.govTrade || 1);
+      const district = (1 + 0.06 * mates + 0.05 * custom) * (flags.govTrade || 1) * (flags.commsTrade || 1);
       const earned = Math.round(rev * share * smogPenalty * highwayTrade * district);
       status[i].demand = share;
       status[i].earned = earned;
@@ -1573,6 +1599,8 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
 
   // The city attorney is on retainer whether or not anyone is suing this week.
   if (flags.lawyerFee) { upkeep += flags.lawyerFee; upCivic += flags.lawyerFee; }
+  if (flags.commsFee) { upkeep += flags.commsFee; upCivic += flags.commsFee; }
+  if (flags.chiefFee) { upkeep += flags.chiefFee; upCivic += flags.chiefFee; }
 
   // Industrial neighbours share the cost of everything that serves them.
   let industrialRebate = 0;
@@ -1680,7 +1708,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     jamSum += Math.min(1.5, jam);
   });
   const globalRelief = transit ? Math.min(0.5, buses.reduce((a, b) => a + (b[3] || 0.07), 0)) : 0;
-  let traffic = roadCount ? Math.min(1, (jamSum / roadCount) * (1 - globalRelief) * (EV && EV.traffic ? EV.traffic : 1) * (flags.iceOn ? 1.15 : 1) * (highwayOn ? HIGHWAY_TRAFFIC : 1)) : 0;
+  let traffic = roadCount ? Math.min(1, (jamSum / roadCount) * (1 - globalRelief) * (EV && EV.traffic ? EV.traffic : 1) * (flags.iceOn ? 1.15 : 1) * (highwayOn ? HIGHWAY_TRAFFIC : 1) * (flags.govTraffic || 1)) : 0;
   // Some events do not scale what you had, they simply stop the city.
   if (EV && EV.trafficFloor && roadCount) traffic = Math.max(traffic, EV.trafficFloor);
 
@@ -1741,6 +1769,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   const envTarget = Math.max(0, Math.min(100,
     100
     - 7 * envStacks * (flags.envDirty || 1)
+    - 3 * envPrisons
     - 9 * envPlants * (flags.envDirty || 1)
     - 24 * traffic
     + 4 * envGreen
@@ -1758,7 +1787,8 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
            taverns: taverns.length, stadiumCrime, eduBuff, schoolCount: schools.length, cameras, churchWeight, churchCount: Math.round(churchWeight), loudChurches,
            highwayOn, mansionOn,
            envTarget, env: flags.env === undefined ? START_ENV : flags.env,
-           envStacks, envPlants, envGreen, envTransit,
+           commsMood: flags.commsMood || 0,
+           envStacks, envPlants, envPrisons, envGreen, envTransit,
            protestMood: flags.protestMood || 0, grace: flags.grace === undefined ? 1 : flags.grace, faith };
 }
 
@@ -1789,7 +1819,7 @@ function calcHap(pop, d, mafia, crime) {
   const hasSchool = (d.schoolCov || []).length > 0;
   const schoolGate = hasSchool && Math.floor(pop) >= (MILESTONE_POP.school || 26) ? 1 : 0;
   const schoolPain = schoolGate * SCHOOL_UNCOVERED_WEIGHT * (1 - Math.min(1, d.schoolFrac || 0)) * gr;
-  let h = 58 + d.envAvg + d.tavernMood + Math.min(10, 1.6 * (d.care || 0)) + (d.protestMood || 0) - unemp * gr - homeless * gr - piety - loudPenalty - envPain - 24 * (d.traffic || 0) - schoolPain;
+  let h = 56 + (d.commsMood || 0) + d.envAvg + d.tavernMood + Math.min(10, 1.6 * (d.care || 0)) + (d.protestMood || 0) - unemp * gr - homeless * gr - piety - loudPenalty - envPain - 24 * (d.traffic || 0) - schoolPain;
   if (mafia === "allied") h -= 10;
   if (mafia === "refused") h -= (crime || 0) * 0.25;
   return Math.round(Math.min(100, Math.max(5, h)));
@@ -1819,7 +1849,10 @@ function step(prev) {
   const CHF = CHIEFS[prev.chiefId] || null;
   const EV = eventById(prev.event);
   const DP = diffOf(prev.diff);
-  const d = derive(prev.grid, Math.floor(prev.pop), prev.tax, prev.fund, prev.terrain, prev.heir, prev.event, { interstate: prev.interstate, works: prev.works, lawyerFee: LAWYERS[prev.lawyerId] ? LAWYERS[prev.lawyerId].fee : 0, govTrade: prev.govTrade, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
+  const d = derive(prev.grid, Math.floor(prev.pop), prev.tax, prev.fund, prev.terrain, prev.heir, prev.event, { interstate: prev.interstate, works: prev.works, govTraffic: prev.govTraffic, lawyerFee: LAWYERS[prev.lawyerId] ? LAWYERS[prev.lawyerId].fee : 0,
+      commsFee: COMMS[prev.commsId] ? COMMS[prev.commsId].fee : 0, commsTrade: COMMS[prev.commsId] ? COMMS[prev.commsId].trade : 1,
+      commsMood: COMMS[prev.commsId] ? COMMS[prev.commsId].mood : 0,
+      chiefFee: CHIEFS[prev.chiefId] ? (CHIEFS[prev.chiefId].salary || 0) : 0, govTrade: prev.govTrade, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
   const baseHap = calcHap(prev.pop, d, prev.mafia, prev.crime);
   const hap = baseHap + (H ? H.mood : 0) + (CHF ? CHF.mood : 0) + (EV && EV.mood ? EV.mood : 0);
   let pop = prev.pop;
@@ -1832,7 +1865,7 @@ function step(prev) {
   else if (hap >= 45 && pop < d.popCap
       && (prev.day + 1) >= (prev.shootingUntil || 0)
       && !((prev.tsuiWar || 0) > 0 && (prev.day + 1) < prev.tsuiWar + 40))
-    pop = Math.min(d.popCap, pop + (0.25 + hap / 95) * T.growth * (EV && EV.growth ? EV.growth : 1) * (d.hideawayOn ? 1.12 : 1) * (prev.faithStance === "attend" ? 0.94 : 1) * (1 + Math.min(0.35, 0.06 * d.learning)) * (prev.ice === 2 ? ICE_GROWTH : 1));
+    pop = Math.min(d.popCap, pop + (0.22 + hap / 100) * (COMMS[prev.commsId] ? COMMS[prev.commsId].growth : 1) * T.growth * (EV && EV.growth ? EV.growth : 1) * (d.hideawayOn ? 1.12 : 1) * (prev.faithStance === "attend" ? 0.94 : 1) * (1 + Math.min(0.35, 0.06 * d.learning)) * (prev.ice === 2 ? ICE_GROWTH : 1));
   else if (hap < 28 && pop > 0) pop = Math.max(0, pop - 1);
   const employed = Math.min(Math.floor(pop), d.jobs);
 
@@ -2182,6 +2215,11 @@ function step(prev) {
   // The governor wants a residence in Luckhead before he wants anything else.
   // Build it and the correspondence begins; leave him waiting and he takes the
   // silence for an answer.
+  // The two of them fall out in public, and Luckhead is asked to pick.
+  let feud = prev.feud || 0;
+  if (feud === 0 && (prev.govAsk || 0) >= 2 && !prev.dictator && day > CRIME_GRACE
+      && evRoll(191) < FEUD_ODDS) feud = 1;
+
   // A clip of Judy Ginsberg explaining a filing deadline gets away from
   // somebody, and for three months honest government is briefly fashionable.
   let judyUntil = prev.judyUntil || 0, judySeen = prev.judySeen || 0;
@@ -2204,9 +2242,9 @@ function step(prev) {
   let tsuiHush = prev.tsuiHush || 0;
   if (tsuiHush === 0 && prev.govBacked && prev.mafia === "allied" && !prev.dictator) tsuiHush = 1;
 
-  // A mayor who has won twice has enemies with filing cabinets.
-  let lawyerOffer = prev.lawyerOffer || 0;
-  if (lawyerOffer === 0 && !prev.lawyerId && !prev.dictator && (prev.elected || 0) >= 1) lawyerOffer = 1;
+  // City Hall has desks nobody sits at, and mentions it once.
+  let staffOffer = prev.staffOffer || 0;
+  if (staffOffer === 0 && !prev.dictator && day >= STAFF_OFFER_DAY) staffOffer = 1;
 
   let govStage = prev.govStage || 0, govPending = prev.govPending || 0;
   let govAsk = prev.govAsk || 0, govAskDay = prev.govAskDay || 0, govBuiltDay = prev.govBuiltDay || 0;
@@ -2484,10 +2522,23 @@ function step(prev) {
   const sRed = net < 0 ? (prev.sRed || 0) + 1 : 0;
   const sDisc = d.anyDisc ? (prev.sDisc || 0) + 1 : 0;
   const sPower = (d.anyUnwired || d.anyOverload) ? (prev.sPower || 0) + 1 : 0;
+
+  // Washington's education audit: are the town's children within reach of a
+  // school, and is that school staffed to teach them. Both, or neither counts.
+  const schoolAge = Math.floor(pop) >= (MILESTONE_POP.school || 26);
+  const schoolRoster = (d.schoolCov || []);
+  const schoolsOk = schoolRoster.length > 0
+    && (d.schoolFrac || 0) >= SCHOOL_AUDIT_FRAC
+    && schoolRoster.every(([, , , crew]) => (crew === undefined ? 1 : crew) >= 1);
+  const sSchool = (schoolAge && !schoolsOk) ? (prev.sSchool || 0) + 1 : 0;
+  let schoolAudit = prev.schoolAudit || 0, schoolNotice = prev.schoolNotice || 0;
+  if (schoolAudit === 0 && sSchool >= SCHOOL_AUDIT_DAYS) { schoolAudit = 1; schoolNotice = 1; }
+  else if (schoolAudit === 1 && schoolsOk) { schoolAudit = 0; schoolNotice = 2; }
   const money = prev.money + net;
   if (money <= DEBT_FLOOR) { over = true; broke = true; }
   const log = newEntries.length ? [...(prev.log || []), ...newEntries].slice(-LOG_KEEP) : (prev.log || []);
-  return { ...prev, musicSet, tsuiLoan, tsuiLoanUntil, tsuiHush, lawyerOffer, potus, judyUntil, judySeen, sIdle, sRed, sDisc, sPower, govStage, govPending, govAsk, govAskDay, govBuiltDay,
+  return { ...prev, musicSet, tsuiLoan, tsuiLoanUntil, tsuiHush, staffOffer, potus, judyUntil, judySeen,
+    feud, sSchool, schoolAudit, schoolNotice, sIdle, sRed, sDisc, sPower, govStage, govPending, govAsk, govAskDay, govBuiltDay,
     govRel: govAsk === 4 ? govRelStep : (prev.govRel || 0), fund: fundKeyNow, tierSeen, tierUp, tierQuote, quotesUsed, log, logSeq, env, speech, promise, promiseDay, promiseSeq, promiseBroken, promiseKept, pop, money, broke, day, mafia, crime, calm, approval, over, elected, ledger, polled, lossWarned, unlocked, chief, smuggleOffer, venueDay, venueOffer, fed, heat, ties, reprisal, dayUnlocked, succession, tsuiReturn, event, eventEnds, eventSeen, nextEvent, challenger, lastElection, electionSeen, theatreDay, bust, pvisit, faithMeet, campaign, loanOffer, tsuiWar, chiefHit, chiefKilled, deadChiefs, vacancyReason, pendingMonument, chiefId, backroom, justBroke: false, ice, iceUntil, graffiti, graffitiUntil, graffitiSeen, billboardDay, riot, riotUntil, riotSeen, prisonDay, viral, viralSeen, viralAck, hideawayFirstDay, blackmail, blackmailSeen, blackmailUntil: prev.blackmailUntil || 0, arsonDay, arsonCount, lastArson, arsonAck, indictWarn, protest, protestUntil, moodLowDays, protestsSeen, strike, strikeUntil, strikeCool, strikesSeen, schoolDemand, cop, copUntil, copCool, doctrine, doctrineCool, lowWarn, envWarn, homelessWarn, shooting, shootingUntil, shootingDead, shootingsSeen, invest, investCool, river, riverUntil, riverCool, riversSeen, pothole, potholeCool, potholeTile, potholesSeen, press,
     peakPop: Math.max(prev.peakPop || 0, Math.floor(pop)),
     peakApproval: Math.max(prev.peakApproval || 0, Math.round(approval)), graft: (prev.graft || 0) + (mafiaMoney > 0 ? mafiaMoney : 0) };
@@ -2866,6 +2917,7 @@ export default function Luckhead() {
   const [funding, setFunding] = useState(false);
   const [worksPanel, setWorksPanel] = useState(false);
   const [lawyerPanel, setLawyerPanel] = useState(false);
+  const [commsPanel, setCommsPanel] = useState(false);
   const [crimeReport, setCrimeReport] = useState(false);
   const [chiefPanel, setChiefPanel] = useState(false);
   const [bribePanel, setBribePanel] = useState(false);
@@ -2906,7 +2958,10 @@ export default function Luckhead() {
   const F = FUND[st.fund] || FUND.normal;
   const EV = eventById(st.event);
   const ecoCost = diffOf(st.diff).economy.cost;
-  const d = useMemo(() => derive(st.grid, Math.floor(st.pop), st.tax, st.fund, st.terrain, st.heir, st.event, { interstate: st.interstate, works: st.works, lawyerFee: LAWYERS[st.lawyerId] ? LAWYERS[st.lawyerId].fee : 0, govTrade: st.govTrade, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
+  const d = useMemo(() => derive(st.grid, Math.floor(st.pop), st.tax, st.fund, st.terrain, st.heir, st.event, { interstate: st.interstate, works: st.works, govTraffic: st.govTraffic, lawyerFee: LAWYERS[st.lawyerId] ? LAWYERS[st.lawyerId].fee : 0,
+      commsFee: COMMS[st.commsId] ? COMMS[st.commsId].fee : 0, commsTrade: COMMS[st.commsId] ? COMMS[st.commsId].trade : 1,
+      commsMood: COMMS[st.commsId] ? COMMS[st.commsId].mood : 0,
+      chiefFee: CHIEFS[st.chiefId] ? (CHIEFS[st.chiefId].salary || 0) : 0, govTrade: st.govTrade, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
   const hap = calcHap(st.pop, d, st.mafia, st.crime);
   const fp = Math.floor(st.pop);
   const employed = Math.min(fp, d.jobs);
@@ -3077,9 +3132,11 @@ export default function Luckhead() {
   const showTsuiLoan = st.tsuiLoan === 1 && !st.over;
   const showGov = st.govPending === 1 && !st.over;
   const showGovAsk = st.govAsk === 1 && !st.over;
-  const showLawyer = st.lawyerOffer === 1 && !st.lawyerId && !st.over;
+  const showStaff = st.staffOffer === 1 && !st.over;
   const showHush = st.tsuiHush === 1 && !st.over;
   const showPotus = st.potus === 1 && !st.over;
+  const showFeud = st.feud === 1 && !st.over;
+  const showAudit = (st.schoolNotice || 0) > 0 && !st.over;
   const showIndict = st.indictWarn === 1 && st.fed === 1 && !st.over;
   const showProtest = st.protest === 1 && !st.over;
   const showStrike = st.strike === 1 && !st.over;
@@ -3102,7 +3159,7 @@ export default function Luckhead() {
   const pendingModals = [
     ["heir", showHeir], ["vote", showVote], ["fed", showFed], ["indict", showIndict], ["protest", showProtest], ["arson", showArson], ["viral", showViral], ["speech", showSpeech], ["invest", showInvest], ["river", showRiver], ["strike", showStrike], ["cop", showCop], ["doctrine", showDoctrine], ["chief", showChief],
     ["ice", showIce], ["blackmail", showBlackmail],
-    ["potus", showPotus], ["hush", showHush], ["lawyer", showLawyer], ["govask", showGovAsk], ["gov", showGov], ["tsuiloan", showTsuiLoan], ["loan", showLoan], ["pvisit", showPvisit], ["bust", showBust],
+    ["potus", showPotus], ["feud", showFeud], ["audit", showAudit], ["hush", showHush], ["staff", showStaff], ["govask", showGovAsk], ["gov", showGov], ["tsuiloan", showTsuiLoan], ["loan", showLoan], ["pvisit", showPvisit], ["bust", showBust],
     ["smuggle", showSmuggle], ["venue", showVenue], ["faith", showFaith],
     ["campaign", showCampaign], ["event", showEvent],
   ].filter(([, on]) => on).map(([k]) => k);
@@ -4632,9 +4689,14 @@ export default function Luckhead() {
           ["YOUR PEOPLE", [
             [CHIEFS[st.chiefId]?.icon || "👮", "Police Chief", CHIEFS[st.chiefId]?.name || "None appointed",
               st.chiefId ? C.cream : C.amber, () => { setHallMenu(false); setChiefPanel(true); }],
+            ...((st.staffOffer || 0) >= 2 ? [
+            [COMMS[st.commsId]?.icon || "📣", "Communications",
+              COMMS[st.commsId] ? `${COMMS[st.commsId].name} · $${COMMS[st.commsId].fee}/day` : "Nobody speaking for you",
+              st.commsId ? C.cream : C.dim, () => { setHallMenu(false); setCommsPanel(true); }],
             [LAWYERS[st.lawyerId]?.icon || "⚖️", "City Attorney",
               LAWYERS[st.lawyerId] ? `${LAWYERS[st.lawyerId].name} · $${LAWYERS[st.lawyerId].fee}/day` : "None retained",
               st.lawyerId ? C.cream : C.dim, () => { setHallMenu(false); setLawyerPanel(true); }],
+            ] : []),
             ["✉️", "Envelopes", st.fed === 1 ? `heat ${heat}/100` : `$${bribeCost(st.bribes, d.bankCount)} each`,
               st.fed === 1 ? C.red : C.amber, () => { setHallMenu(false); setBribePanel(true); }],
           ]],
@@ -5557,6 +5619,70 @@ export default function Luckhead() {
         </div>
       )}
 
+      {/* the two of them fall out in public */}
+      {show("feud") && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 64, padding: 16 }}>
+          <div style={{ width: "min(88vw, 362px)", background: C.panel, border: `1px solid ${C.amber}`, borderRadius: 16, padding: 18 }}>
+            <div style={{ ...mono, fontSize: 10, color: C.amber, letterSpacing: "0.2em", marginBottom: 3 }}>REPORTERS ON THE CITY HALL STEPS</div>
+            <div style={{ ...disp, fontSize: 17, marginBottom: 10 }}>THE PRESIDENT AND THE GOVERNOR ARE FIGHTING</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
+              Washington and the statehouse have been trading insults in public for a week, and reporters outside City Hall want to know which one Luckhead stands behind.
+            </div>
+            <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+              <span style={{ color: C.cream }}>STAND WITH THE PRESIDENT</span> · federal standing up · one federal entanglement disappears · -1 with Sanders<br />
+              <span style={{ color: C.cream }}>STAND WITH THE GOVERNOR</span> · +2 with Sanders · federal standing down
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <span style={{ flex: 1 }} />
+              <span onClick={() => { setSt((s) => ({ ...s, feud: 2, govRel: (s.govRel || 0) + 2,
+                                       fedFavor: Math.max(FED_FAVOR_MIN, (s.fedFavor || 0) - 1), modalGap: s.day + MODAL_GAP_SOFT }));
+                                     setToast("\uD83C\uDFDB\uFE0F You back Sanders. Washington notes it."); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: "transparent", color: C.cream, border: `1px solid ${C.line}`, borderRadius: 9, padding: "7px 12px" }}>THE GOVERNOR</span>
+              <span onClick={() => { setSt((s) => {
+                       const n = { ...s, feud: 2, govRel: (s.govRel || 0) - 1,
+                                   fedFavor: Math.min(FED_FAVOR_MAX, (s.fedFavor || 0) + 1), modalGap: s.day + MODAL_GAP_SOFT };
+                       // one entanglement, whichever is nearest to hand
+                       if (n.rigged) n.rigged = Math.max(0, n.rigged - 1);
+                       else if (n.backroom) n.backroom = false;
+                       else if (n.investTook) n.investTook = 0;
+                       else if (n.smuggleOffer === 3) { n.smuggleOffer = 0; n.grid = s.grid.map((c) => (c && c.smuggle ? { ...c, smuggle: false } : c)); }
+                       else if (n.river === 3) n.river = 0;
+                       return n;
+                     });
+                     setToast("\uD83C\uDDFA\uD83C\uDDF8 You back the President. A file gets thinner overnight."); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: C.amber, color: C.ink, borderRadius: 9, padding: "7px 12px" }}>THE PRESIDENT</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* the education audit */}
+      {show("audit") && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 64, padding: 16 }}>
+          <div style={{ width: "min(88vw, 356px)", background: C.panel, border: `1px solid ${st.schoolNotice === 1 ? C.red : C.green}`, borderRadius: 16, padding: 18 }}>
+            <div style={{ ...mono, fontSize: 10, color: st.schoolNotice === 1 ? C.red : C.green, letterSpacing: "0.2em", marginBottom: 3 }}>
+              {st.schoolNotice === 1 ? "A LETTER FROM THE DEPARTMENT" : "THE AUDIT IS CLOSED"}
+            </div>
+            <div style={{ ...disp, fontSize: 17, marginBottom: 10 }}>
+              {st.schoolNotice === 1 ? "THE STATE PULLS LUCKHEAD'S FUNDING" : "FEDERAL FUNDING RESUMES"}
+            </div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
+              {st.schoolNotice === 1
+                ? "A federal education audit has found that Luckhead's schools do not reach the town's children and are not staffed to do it if they did. Every federal dollar stops until that changes."
+                : "The auditors have been back. Luckhead's schools now reach its children and have the teachers to teach them. The federal line is restored from today."}
+            </div>
+            <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.5 }}>
+              The standard is {Math.round(SCHOOL_AUDIT_FRAC * 100)}% of homes inside a school's reach, with every school fully staffed.
+            </div>
+            <div style={{ display: "flex", marginTop: 14 }}>
+              <span style={{ flex: 1 }} />
+              <span onClick={() => setSt((s) => ({ ...s, schoolNotice: 0, modalGap: s.day + MODAL_GAP }))}
+                style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.orange, color: C.ink, borderRadius: 9, padding: "7px 14px" }}>UNDERSTOOD</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* the President has a preferred attorney */}
       {show("potus") && (() => {
         const cur = LAWYERS[st.lawyerId];
@@ -5621,42 +5747,24 @@ export default function Luckhead() {
         </div>
       )}
 
-      {/* the city attorney, hired once the mayor has survived a re-election */}
-      {show("lawyer") && (
+      {/* City Hall mentions the empty desks, once */}
+      {show("staff") && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 63, padding: 16 }}>
-          <div style={{ width: "min(92vw, 380px)", maxHeight: "88vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.cream}`, borderRadius: 16, padding: 18 }}>
-            <div style={{ ...mono, fontSize: 10, color: C.dim, letterSpacing: "0.2em", marginBottom: 3 }}>A SECOND TERM CHANGES THINGS</div>
-            <div style={{ ...disp, fontSize: 17, marginBottom: 8 }}>LUCKHEAD NEEDS A LAWYER</div>
-            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim, marginBottom: 12 }}>
-              A mayor who wins once is lucky. A mayor who wins twice has a record, and somewhere there is a filing cabinet with Luckhead's name on it. Three people will take the job, and none of them will hold you to it: City Hall can change counsel whenever you like.
+          <div style={{ width: "min(88vw, 356px)", background: C.panel, border: `1px solid ${C.cream}`, borderRadius: 16, padding: 18 }}>
+            <div style={{ ...mono, fontSize: 10, color: C.dim, letterSpacing: "0.2em", marginBottom: 3 }}>THE DESKS DOWN THE HALL</div>
+            <div style={{ ...disp, fontSize: 17, marginBottom: 10 }}>YOUR OWN PEOPLE</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
+              Replacing current staff with your own people could be advantageous to your goals. Both positions can be filled at City Hall.
             </div>
-            {LAWYER_KEYS.map((k) => {
-              const L = LAWYERS[k];
-              return (
-                <div key={k} onClick={() => {
-                    setSt((s) => ({ ...s, lawyerId: k, lawyerOffer: 2, lawyerFrom: s.day, modalGap: s.day + MODAL_GAP }));
-                    setToast(`\u2696\uFE0F ${L.name} takes the job.`);
-                  }}
-                  style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 11, cursor: "pointer", border: `1px solid ${C.line}` }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontSize: 13 }}>{L.icon}</span>
-                    <span style={{ ...disp, fontSize: 14, color: C.cream }}>{L.name}</span>
-                    <span style={{ flex: 1 }} />
-                    <span style={{ ...mono, fontSize: 10, color: C.amber }}>${L.fee}/day</span>
-                  </div>
-                  <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 3, fontStyle: "italic" }}>{L.line}</div>
-                  <div style={{ ...mono, fontSize: 9.5, color: C.dim, marginTop: 4, lineHeight: 1.5 }}>
-                    {L.effects.map((e) => "\u00b7 " + e).join("  ")}
-                  </div>
-                </div>
-              );
-            })}
-            <div style={{ display: "flex", marginTop: 6 }}>
+            <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+              <span style={{ color: C.cream }}>CITY ATTORNEY</span> &middot; handles what arrives in envelopes<br />
+              <span style={{ color: C.cream }}>COMMUNICATIONS</span> &middot; decides how Luckhead sounds when it speaks<br />
+              Each wants a wage every day, and a fee to change your mind later.
+            </div>
+            <div style={{ display: "flex", marginTop: 14 }}>
               <span style={{ flex: 1 }} />
-              <span onClick={() => { setSt((s) => ({ ...s, lawyerOffer: 2, modalGap: s.day + MODAL_GAP })); setToast("\u2696\uFE0F Luckhead will represent itself."); }}
-                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: "transparent", color: C.cream, border: `1px solid ${C.line}`, borderRadius: 9, padding: "6px 12px" }}>
-                NOBODY, FOR NOW
-              </span>
+              <span onClick={() => { setSt((s) => ({ ...s, staffOffer: 2, modalGap: s.day + MODAL_GAP_SOFT })); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.orange, color: C.ink, borderRadius: 9, padding: "7px 14px" }}>UNDERSTOOD</span>
             </div>
           </div>
         </div>
@@ -5690,37 +5798,68 @@ export default function Luckhead() {
         const doubt = Math.floor((st.graft || 0) / GOV_GRAFT_PER_DOUBT);
         const standing = (st.govRel || 0) - doubt;
         const close = (patch, msg) => {
-          setSt((s) => ({ ...s, govPending: 0, govStage: (s.govStage || 0) + 1, modalGap: s.day + MODAL_GAP, ...patch }));
+          setSt((s) => {
+            const p = { ...patch };
+            let grid = s.grid;
+            if (p.__apartment) {
+              delete p.__apartment;
+              const road = (idx) => { const c = s.grid[idx]; return c && (c.type === "road" || c.type === "bridge") && !c.build; };
+              let spot = -1;
+              for (let i = 0; i < s.grid.length && spot < 0; i++) {
+                if (s.grid[i]) continue;
+                if ((s.terrain || [])[i] === WATER) continue;
+                const r = Math.floor(i / SIZE), c = i % SIZE;
+                const nb = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]]
+                  .filter(([rr,cc]) => rr >= 0 && cc >= 0 && rr < SIZE && cc < SIZE)
+                  .map(([rr,cc]) => at0(rr,cc));
+                if (nb.some(road)) spot = i;
+              }
+              if (spot >= 0) {
+                grid = s.grid.slice();
+                grid[spot] = { type: "house", lv: 3, seq: s.seq };
+                p.seq = s.seq + 1;
+              } else {
+                let smallest = -1, best = 99;
+                s.grid.forEach((c, i) => { if (c && c.type === "house" && !c.build && (c.lv || 0) < best) { best = c.lv || 0; smallest = i; } });
+                if (smallest >= 0) { grid = s.grid.slice(); grid[smallest] = { ...grid[smallest], lv: 3 }; }
+                else { p.money = (p.money === undefined ? s.money : p.money) + 400; }
+              }
+              p.grid = grid;
+            }
+            return { ...s, govPending: 0, govStage: (s.govStage || 0) + 1, modalGap: s.day + MODAL_GAP, ...p };
+          });
           if (msg) setToast(msg);
         };
         const ASKS = [
           { tag: "A LETTER FROM THE STATEHOUSE",
-            title: "THE GOVERNOR WRITES",
-            body: "Governor Sanders has noticed Luckhead. He is not fond of city government on principle, but he is fond of towns that do business his way. There is a state partnership programme, and a place in it for you.",
-            yes: { label: "SIGN ON", note: "$600 from the state, and the locals notice whose hand you shook.",
+            title: "THE GOVERNOR WANTS A PHOTO",
+            body: "Governor Sonny Sanders is coming through the district and would like to be photographed shaking your hand outside City Hall. The state keeps $600 in a discretionary fund for towns that cooperate.",
+            yes: { label: "DO THE PHOTO OP", note: "$600 now, +1 standing, -4 approval for a handshake with an unpopular Governor.",
                    patch: (s) => ({ govRel: (s.govRel || 0) + 1, money: s.money + 600, approval: Math.max(0, s.approval - 4) }),
-                   toast: "\uD83C\uDFDB\uFE0F Luckhead joins the state partnership. Six hundred dollars and a photograph." },
-            no:  { label: "STAY INDEPENDENT", note: "Luckhead keeps its own counsel.",
+                   toast: "\uD83C\uDFDB\uFE0F Six hundred dollars and a photograph nobody in Luckhead wanted." },
+            no:  { label: "DECLINE", note: "Nothing gained, -1 standing.",
                    patch: (s) => ({ govRel: (s.govRel || 0) - 1 }),
                    toast: "\uD83C\uDFDB\uFE0F You send regrets. The statehouse files the letter." } },
-          { tag: "A DEVELOPER WITH A LETTER OF INTRODUCTION",
-            title: "THE GOVERNOR'S FRIEND WANTS A BREAK",
-            body: "A developer arrives with Sonny Sanders's card in his pocket. He wants the fees waived on a project nobody in Luckhead asked for. The governor would take it as a personal courtesy.",
-            yes: { label: "WAIVE THE FEES", note: "Trade rises 8% for good. The air and the paperwork both suffer.",
-                   patch: (s) => ({ govRel: (s.govRel || 0) + 1, money: s.money + 400, govTrade: 1.08, env: Math.max(0, (s.env || 0) - 5) }),
-                   toast: "\uD83C\uDFDB\uFE0F The permits clear in a week. Business is grateful." },
-            no:  { label: "HE PAYS LIKE ANYONE", note: "The rules hold. So does the grudge.",
+          { tag: "A DEVELOPER ON THE GOVERNOR'S FOURSOME",
+            title: "THE GOVERNOR'S GOLFING BUDDY",
+            body: "A developer who golfs with Sonny Sanders would like to put up another apartment complex, on roads that are already crowded. He would like your assistance in making it a smooth process, and a fee-free one.",
+            yes: { label: "WAVE IT THROUGH", note: "A finished Apartments block, free. +1 standing. Traffic rises for good.",
+                   patch: (s) => ({ govRel: (s.govRel || 0) + 1, govTraffic: 1.1, __apartment: true }),
+                   toast: "\uD83C\uDFDB\uFE0F The permits clear in a week. Eighteen more front doors on the same road." },
+            no:  { label: "MAKE HIM PAY", note: "+3 approval, -1 standing. The rules hold.",
                    patch: (s) => ({ govRel: (s.govRel || 0) - 1, approval: Math.min(100, s.approval + 3) }),
                    toast: "\uD83C\uDFDB\uFE0F He pays the fees like everyone else. Luckhead approves." } },
           { tag: "AN INVITATION TO THE PRAYER BREAKFAST",
-            title: "THE GOVERNOR WOULD LIKE THE CITY TO HOST",
-            body: "An annual state prayer breakfast, held in Luckhead, at Luckhead's expense. He will be there. So will every camera in the district, and every congregation in town.",
-            yes: { label: "HOST IT ($700)", note: "The churches remember. So does he.",
-                   patch: (s) => ({ govRel: (s.govRel || 0) + 1, money: s.money - 700, approval: Math.min(100, s.approval + 5) }),
-                   toast: "\uD83C\uDFDB\uFE0F A full hall and a good photograph. The governor stays for coffee." },
-            no:  { label: "DECLINE POLITELY", note: "The city keeps its seven hundred dollars.",
-                   patch: (s) => ({ govRel: (s.govRel || 0) - 1 }),
-                   toast: "\uD83C\uDFDB\uFE0F The breakfast is held two counties over." } },
+            title: "THE STATE PRAYER BREAKFAST",
+            body: "Sanders wants the annual state prayer breakfast held in Luckhead, at Luckhead's expense. Every camera in the district will be there, and so will every congregation in town.",
+            yes: { label: "HOST IT ($700)", note: "+1 standing. Every Church works 10% better for " + GOV_BREAKFAST_DAYS + " days.",
+                   patch: (s) => ({ govRel: (s.govRel || 0) + 1, money: s.money - 700,
+                                    churchGov: 1.1, churchGovUntil: s.day + GOV_BREAKFAST_DAYS }),
+                   toast: "\uD83C\uDFDB\uFE0F A full hall and a good photograph. The pews are busy for months." },
+            no:  { label: "DECLINE", note: "Keep the $700. -1 standing. Every Church works 15% worse for " + GOV_BREAKFAST_DAYS + " days.",
+                   patch: (s) => ({ govRel: (s.govRel || 0) - 1,
+                                    churchGov: 0.85, churchGovUntil: s.day + GOV_BREAKFAST_DAYS }),
+                   toast: "\uD83C\uDFDB\uFE0F The breakfast is held two counties over. Word gets round the parishes." } },
         ];
         const btn = (bg, fg) => ({ ...disp, cursor: "pointer", fontSize: 12.5, background: bg, color: fg, borderRadius: 9, padding: "7px 13px" });
 
@@ -6334,6 +6473,60 @@ export default function Luckhead() {
         );
       })()}
 
+      {/* the communications director */}
+      {commsPanel && (
+        <div onClick={() => setCommsPanel(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 62, padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(92vw, 380px)", maxHeight: "86vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
+            <div style={{ ...disp, fontSize: 18 }}>COMMUNICATIONS</div>
+            <div style={{ ...mono, fontSize: 10.5, color: C.dim, marginBottom: 12 }}>
+              {st.commsId
+                ? "On retainer. Change whenever you like, for a signing fee."
+                : "Nobody is speaking for Luckhead. Trade, arrivals and mood all sit at their own level."}
+            </div>
+            {COMMS_KEYS.map((k) => {
+              const M = COMMS[k];
+              const on = st.commsId === k;
+              const fee = st.commsId ? M.fee * COMMS_SIGNING : 0;
+              return (
+                <div key={k}
+                  onClick={() => {
+                    if (on) return;
+                    if (st.money < fee) { setNote(`${M.name} wants $${fee.toLocaleString()} to sign. Luckhead does not have it.`); return; }
+                    setSt((s) => ({ ...s, commsId: k, money: s.money - fee }));
+                    setNote(`${M.name} starts on Monday. $${fee.toLocaleString()} to sign.`);
+                  }}
+                  style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 11, cursor: on ? "default" : "pointer",
+                           background: on ? C.bg : "transparent", border: `1px solid ${on ? C.orange : C.line}` }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ fontSize: 13 }}>{M.icon}</span>
+                    <span style={{ ...disp, fontSize: 14, color: on ? C.orange : C.cream }}>{M.name}</span>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ ...mono, fontSize: 10, color: on ? C.amber : C.dim }}>
+                      ${M.fee}/day{!on ? ` \u00b7 $${fee.toLocaleString()} to sign` : ""}
+                    </span>
+                  </div>
+                  <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 3, fontStyle: "italic" }}>{M.line}</div>
+                  <div style={{ ...mono, fontSize: 9.5, color: C.dim, marginTop: 4, lineHeight: 1.5 }}>
+                    {M.effects.map((e) => "\u00b7 " + e).join("  ")}
+                  </div>
+                </div>
+              );
+            })}
+            {st.commsId && (
+              <div onClick={() => { setSt((s) => ({ ...s, commsId: null })); setNote("Luckhead speaks for itself again. The retainer stops today."); }}
+                style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 11, cursor: "pointer", border: `1px solid ${C.line}` }}>
+                <div style={{ ...disp, fontSize: 13, color: C.dim }}>LET THEM GO</div>
+                <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 2 }}>No retainer, and no help with any of it.</div>
+              </div>
+            )}
+            <div style={{ display: "flex", marginTop: 6 }}>
+              <span style={{ flex: 1 }} />
+              <span onClick={() => setCommsPanel(false)} style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.orange, color: C.ink, borderRadius: 9, padding: "6px 14px" }}>CLOSE</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* the city attorney's file */}
       {lawyerPanel && (
         <div onClick={() => setLawyerPanel(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 62, padding: 16 }}>
@@ -6352,7 +6545,7 @@ export default function Luckhead() {
                   onClick={() => {
                     if (on) return;
                     if (st.lawyerLocked) { setNote("Nancy Nace was appointed at the President's request. She is not going anywhere."); return; }
-                    const fee = L.fee * LAWYER_SIGNING;
+                    const fee = st.lawyerId ? L.fee * LAWYER_SIGNING : 0;
                     if (st.money < fee) { setNote(`${L.name} wants $${fee.toLocaleString()} to take the file on. Luckhead does not have it.`); return; }
                     setSt((s) => ({ ...s, lawyerId: k, lawyerFrom: s.day, money: s.money - fee }));
                     setNote(`${L.name} takes over for $${fee.toLocaleString()}. It will be ${LAWYER_HANDOVER} days before she is across the file.`);
