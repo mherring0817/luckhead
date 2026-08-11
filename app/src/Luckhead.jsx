@@ -650,7 +650,7 @@ function approvalRows(S, d, hap) {
   // Standing with the statehouse, less whatever the family has paid you. He
   // hears things.
   const LWG = LAWYERS[S.lawyerId];
-  const heardGraft = (S.graft || 0) * (LWG && LWG.graftShield ? 0 : 1);
+  const heardGraft = (S.graft || 0) * (LWG && LWG.graftShield ? 0 : 1) * (S.testified ? 0.35 : 1);
   const govStanding = (S.govRel || 0) - Math.floor(heardGraft / GOV_GRAFT_PER_DOUBT)
     + (LWG ? LWG.gov : 0);
   if (govStanding >= 2) push("The statehouse is friendly", 2);
@@ -968,8 +968,8 @@ const EVENTS = [
     tag: "City-wide gridlock for five days", traffic: 1.8, trafficFloor: 0.92,
     choice: { pay: 400, label: "CALL IN THE PLOWS", done: "Every plow within fifty miles, at holiday rates. Luckhead moves again." } },
   { id: "film", name: "Movie Filming in Luckhead", icon: "🎬", days: 30,
-    body: "A production has taken over half the city. Shops cannot keep up with the crews, the streets are closed at random, and your officers are spending their shifts guarding a catering truck.",
-    tag: "Commercial +20%, traffic up, police distracted", trade: 1.2, traffic: 1.2, crime: 3, good: true },
+    body: "A production has taken over half the city. Shops cannot keep up with the crews and the streets are closed at random, half of them at once, for a month. Nobody in Luckhead can get anywhere, and every one of them has an opinion about the catering truck.",
+    tag: "Commercial +20%, streets closed at random", trade: 1.2, traffic: 1.55, good: true },
 ];
 const eventById = (id) => EVENTS.find((e) => e.id === id) || null;
 
@@ -3006,6 +3006,7 @@ export default function Luckhead() {
   const [commsPanel, setCommsPanel] = useState(false);
   const [crimeReport, setCrimeReport] = useState(false);
   const [statPanel, setStatPanel] = useState(null);   // 'approval' | 'mood' | 'growth' | 'env'
+  const [tiesPanel, setTiesPanel] = useState(false);
   const [chiefPanel, setChiefPanel] = useState(false);
   const [bribePanel, setBribePanel] = useState(false);
   const [prPanel, setPrPanel] = useState(false);
@@ -4327,8 +4328,19 @@ export default function Luckhead() {
       )}
 
       {/* board */}
-      <div style={{ width: boardW, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: 6, display: "grid", gridTemplateColumns: `repeat(${SIZE}, 1fr)`, gap: 2 }}>
-        {st.grid.map((_, i) => <Tile key={i} i={i} />)}
+      <div style={{ position: "relative", width: boardW }}>
+        <div style={{ width: "100%", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: 6, display: "grid", gridTemplateColumns: `repeat(${SIZE}, 1fr)`, gap: 2, boxSizing: "border-box" }}>
+          {st.grid.map((_, i) => <Tile key={i} i={i} />)}
+        </div>
+        {speed === "pause" && !st.over && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                        pointerEvents: "none", zIndex: 8 }}>
+            <span style={{ ...disp, fontSize: "clamp(26px, 9vw, 46px)", letterSpacing: "0.22em",
+                           color: C.cream, opacity: 0.22, textShadow: `0 2px 14px ${C.bg}` }}>
+              PAUSED
+            </span>
+          </div>
+        )}
       </div>
 
       {beatMap && (
@@ -4769,6 +4781,13 @@ export default function Luckhead() {
           ["WHERE YOU STAND", [
             ["🗳️", "PR Panel", `${Math.round(st.approval)}% approval`,
               st.approval >= 51 ? C.green : C.red, () => { setHallMenu(false); setPrPanel(true); }],
+            ["🤝", "Relationships", (() => {
+                const f = fedFavorOf(st);
+                const g = (st.govRel || 0) - Math.floor((st.graft || 0) * ((LAWYERS[st.lawyerId] || {}).graftShield ? 0 : 1) * (st.testified ? 0.35 : 1) / GOV_GRAFT_PER_DOUBT) + (LAWYERS[st.lawyerId] ? LAWYERS[st.lawyerId].gov : 0);
+                const warm = (f >= 1 ? 1 : 0) + (g >= 2 ? 1 : 0) + (st.mafia === "allied" ? 1 : 0);
+                const cold = (f <= -1 ? 1 : 0) + (g <= -1 ? 1 : 0) + (st.mafia === "refused" ? 1 : 0);
+                return cold > warm ? "more enemies than friends" : warm > cold ? `${warm} of 3 on your side` : "nobody owes you anything";
+              })(), C.cream, () => { setHallMenu(false); setTiesPanel(true); }],
             ["🔦", "Crime Report", `${Math.round(st.crime)} on the street`,
               st.crime >= 60 ? C.red : st.crime >= 30 ? C.amber : C.green, () => { setHallMenu(false); setCrimeReport(true); }],
             ["📋", "State of the City", `score ${L.total}`, C.cream, () => { setHallMenu(false); setStatePanel(true); }],
@@ -5978,7 +5997,7 @@ export default function Luckhead() {
                 <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>{A.body}</div>
                 {doubt > 0 && (
                   <div style={{ ...mono, fontSize: 10, color: C.amber, marginTop: 8, lineHeight: 1.5 }}>
-                    He has heard where some of Luckhead's money comes from. Whatever you say today is worth {doubt} point{doubt === 1 ? "" : "s"} less than it should be.
+                    He has heard where some of Luckhead's money comes from. Whatever you decide today, he will trust you less than he otherwise would. Breaking with the family and testifying against them would put most of it behind you.
                   </div>
                 )}
                 <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
@@ -6533,6 +6552,93 @@ export default function Luckhead() {
       })()}
 
       {/* crime report */}
+      {tiesPanel && (() => {
+        const favor = fedFavorOf(st);
+        const grant = fedGrantOf(st, Math.floor(st.pop));
+        const LW = LAWYERS[st.lawyerId];
+        const doubt = Math.floor((st.graft || 0) * (LW && LW.graftShield ? 0 : 1) * (st.testified ? 0.35 : 1) / GOV_GRAFT_PER_DOUBT);
+        const standing = (st.govRel || 0) - doubt + (LW ? LW.gov : 0);
+        const kickNow = st.mafia === "allied" ? kickbackFor(st.deal, st.rigged) : 0;
+
+        const fedLines = [];
+        fedLines.push([`Grant paying $${grant}/day`, grant > 0 ? 1 : -1]);
+        if (st.schoolAudit) fedLines.push(["Education audit has stopped every federal dollar", -1]);
+        if (st.pvisit === 2) fedLines.push(["You hosted the President", 1]);
+        if (st.pvisit === 3) fedLines.push(["You snubbed the President's visit", -1]);
+        if (st.ice === 2) fedLines.push(["You let ICE into the city", 1]);
+        if (st.ice === 3) fedLines.push(["You refused the ICE demand", -1]);
+        if (st.potus === 2 && st.lawyerLocked) fedLines.push(["You appointed his choice of attorney", 1]);
+        if (st.fed === 1) fedLines.push(["The Bureau has a file open on you", -1]);
+        if (st.fed === 2) fedLines.push(["You have been indicted", -1]);
+
+        const govLines = [];
+        if (st.govAsk === 0) govLines.push(["He has not written yet", 0]);
+        if (st.govAsk === 1 || st.govAsk === 2) govLines.push(["Waiting on a residence he asked for", 0]);
+        if (st.govAsk === 4) govLines.push(["You never built the mansion", -1]);
+        if ((st.govRel || 0) > 0) govLines.push([`${st.govRel} favour${st.govRel === 1 ? "" : "s"} done for him`, 1]);
+        if ((st.govRel || 0) < 0) govLines.push([`${Math.abs(st.govRel)} time${st.govRel === -1 ? "" : "s"} you turned him down`, -1]);
+        if (doubt > 0) govLines.push([`He has heard about the Tsui money`, -1]);
+        if (LW && LW.graftShield) govLines.push([`${LW.name} keeps the money out of sight`, 1]);
+        if (st.testified) govLines.push(["You testified against the family", 1]);
+        if (LW && LW.gov) govLines.push([`${LW.name} as city attorney`, LW.gov > 0 ? 1 : -1]);
+        if (d.mansionOn && st.tax === "normal") govLines.push(["Mansion standing, Conservative Tax", 1]);
+        else if (d.mansionOn) govLines.push(["Mansion standing, but your tax policy is not his", 0]);
+        if (st.govBacked) govLines.push(["He is funding your opponent", -1]);
+
+        const tsuiLines = [];
+        if (st.mafia === "none") tsuiLines.push(["No arrangement either way", 0]);
+        if (st.mafia === "allied") tsuiLines.push([`Kickbacks of $${kickNow}/day`, kickNow > 0 ? 1 : -1]);
+        if (st.mafia === "refused") tsuiLines.push(["At war with the family", -1]);
+        if (st.mafia === "defeated") tsuiLines.push(["The family is finished in Luckhead", 1]);
+        if (st.graft) tsuiLines.push([`$${(st.graft || 0).toLocaleString()} taken from them, all told`, -1]);
+        if (st.tsuiBound) tsuiLines.push(["Bound to them permanently. You cannot testify", -1]);
+        if (st.testified) tsuiLines.push(["You testified against them", 1]);
+        if (st.blackmail === 3) tsuiLines.push(["They are talking to reporters", -1]);
+        if (st.deal > 0) tsuiLines.push([`${st.deal} renegotiation${st.deal === 1 ? "" : "s"}`, 0]);
+
+        const powers = [
+          { who: "WASHINGTON", sub: "The President",
+            state: FED_FAVOR_NAME[String(favor)], tone: favor >= 1 ? C.green : favor <= -1 ? C.red : C.cream, lines: fedLines },
+          { who: "THE STATEHOUSE", sub: "Governor Sonny Sanders",
+            state: standing >= 2 ? "friendly" : standing <= -1 ? "hostile" : "correct, and no more", tone: standing >= 2 ? C.green : standing <= -1 ? C.red : C.cream, lines: govLines },
+          { who: "THE FAMILY", sub: "Vincent Tsui",
+            state: st.mafia === "allied" ? (st.tsuiBound ? "they own you" : "allied") : st.mafia === "refused" ? "at war" : st.mafia === "defeated" ? "beaten" : "no arrangement",
+            tone: st.mafia === "allied" ? C.amber : st.mafia === "refused" ? C.red : C.cream, lines: tsuiLines },
+        ];
+
+        return (
+          <div onClick={() => setTiesPanel(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 62, padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "min(92vw, 390px)", maxHeight: "88vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
+              <div style={{ ...disp, fontSize: 18 }}>RELATIONSHIPS</div>
+              <div style={{ ...mono, fontSize: 10.5, color: C.dim, marginBottom: 12 }}>Three powers with an interest in Luckhead, and where each of them has you.</div>
+              {powers.map((p) => (
+                <div key={p.who} style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 11, border: `1px solid ${C.line}` }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ ...mono, fontSize: 9.5, color: C.dim, letterSpacing: "0.18em" }}>{p.who}</span>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ ...disp, fontSize: 13, color: p.tone }}>{p.state}</span>
+                  </div>
+                  <div style={{ ...mono, fontSize: 9.5, color: C.dim, marginTop: 1, marginBottom: 5 }}>{p.sub}</div>
+                  {p.lines.length === 0 && <div style={{ ...mono, fontSize: 10.5, color: C.dim }}>Nothing between you yet.</div>}
+                  {p.lines.map(([label, tone]) => (
+                    <div key={label} style={{ display: "flex", gap: 6, ...mono, fontSize: 10.5, padding: "1.5px 0", lineHeight: 1.4 }}>
+                      <span style={{ color: tone > 0 ? C.green : tone < 0 ? C.red : C.dim, width: 8 }}>
+                        {tone > 0 ? "+" : tone < 0 ? "\u2212" : "\u00b7"}
+                      </span>
+                      <span style={{ color: C.dim, flex: 1 }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              <div style={{ display: "flex" }}>
+                <span style={{ flex: 1 }} />
+                <span onClick={() => setTiesPanel(false)} style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.orange, color: C.ink, borderRadius: 9, padding: "6px 14px" }}>CLOSE</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {statPanel && (() => {
         const cfg = {
           approval: { title: "APPROVAL", sub: `${Math.round(st.approval)}% today \u00b7 51% wins an election`,
