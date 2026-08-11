@@ -877,6 +877,10 @@ const HINTS = [
     title: "THE ROAD BUDGET IS YOURS", icon: "\uD83D\uDEA7",
     body: "City Hall has a Public Works setting beside Police Funding. It decides what your roads cost to keep and how much traffic they carry, and whether the money goes to asphalt or to buses and subways instead.",
     tip: "Transit First is worth it only if you have a network to spend it on. Bare Minimum is cheap and it shows." },
+  { id: "gridlock", when: (st, d) => (d.traffic || 0) > 0.5,
+    title: "THE TOWN IS GRIDLOCKED", icon: "\uD83D\uDEA6",
+    body: "Traffic is over half of what Luckhead's roads can carry, and it is costing you on every front at once: trade revenue, clean air, and crime all get worse the longer it holds. Red streets on the map are the ones over capacity. Four things help. Parallel roads, because one route carrying everything jams while two carrying half each do not. Bus Stations or Subway Stops, at least two or the network does nothing, placed across from Apartments, Factories and Music Venues. Public Works in City Hall, where Pave Everything buys 22% more capacity for half again the upkeep and Transit First makes buses and subways work 45% harder instead.",
+    tip: "And check the interstate. If you have connected to the off-ramp, some of this is through traffic. Tearing up the road cuts traffic and improves the environment at the cost of revenue." },
   { id: "coverage", when: (st, d, fp) => fp >= 12 && st.grid.some((c) => c && c.type === "police" && !c.build),
     title: "SEE WHO IS COVERED", icon: "\uD83D\uDC6E",
     body: "The \uD83D\uDC6E button above the map shades every tile your stations reach and rings the buildings nobody is watching. Once schools exist it does the same for them in rose.",
@@ -1797,6 +1801,74 @@ const homelessRate = (pop, d) => {
   return fp > 0 ? Math.max(0, fp - (d.housing || 0)) / fp : 0;
 };
 
+// What the town's mood is made of. Mirrors calcHap term for term; if one
+// changes the other has to follow.
+function moodRows(pop, d, mafia, crime) {
+  const rows = [];
+  const push = (l, v) => { if (Math.abs(v) >= 0.05) rows.push([l, v]); };
+  const fp = Math.floor(pop);
+  const gr = d.grace === undefined ? 1 : d.grace;
+  push("Baseline", 56);
+  if (d.commsMood) push("Communications director", d.commsMood);
+  push("Environment", d.envAvg);
+  push("Taverns", d.tavernMood);
+  push("Clinics and hospitals", Math.min(10, 1.6 * (d.care || 0)));
+  if (d.protestMood) push("Protests", d.protestMood);
+  const unemp = fp > 0 ? Math.max(0, (fp - d.jobs) / fp) * 32 * Math.min(1, fp / 12) : 0;
+  push("Idle residents", -unemp * gr);
+  const hr = homelessRate(pop, d);
+  push("Rough sleeping", -(hr <= 0.05 ? hr * 46 : 2.3 + (hr - 0.05) * 175) * gr);
+  push("Congregations", -1.2 * (d.churchWeight || 0));
+  push("Churches drowned out", -2 * (d.loudChurches || 0));
+  const envNow = d.env === undefined ? 100 : d.env;
+  push("Air quality alarm", -(envNow >= ENV_ALARM ? 0 : (ENV_ALARM - envNow) * 0.45));
+  push("Traffic", -24 * (d.traffic || 0));
+  const hasSchool = (d.schoolCov || []).length > 0;
+  const schoolGate = hasSchool && fp >= (MILESTONE_POP.school || 26) ? 1 : 0;
+  push("Homes outside a school district", -schoolGate * SCHOOL_UNCOVERED_WEIGHT * (1 - Math.min(1, d.schoolFrac || 0)) * gr);
+  if (mafia === "allied") push("The family's presence", -3);
+  if (crime > CRIME_THRESHOLD) push("Crime on the street", -(crime - CRIME_THRESHOLD) * 0.25);
+  return rows;
+}
+
+// Why newcomers are or are not arriving. Multipliers are shown as percentages
+// so the whole thing reads on one screen.
+function growthRows(st, d, hap) {
+  const rows = [];
+  const T = TAX[st.tax] || TAX.normal;
+  const EV = eventById(st.event);
+  const CM = COMMS[st.commsId];
+  const blocked = [];
+  if (hap < 45) blocked.push("Mood is under 45. Nobody moves to an unhappy town.");
+  if (Math.floor(st.pop) >= Math.floor(d.popCap)) blocked.push("Every home is full. Build housing.");
+  if (st.day < (st.shootingUntil || 0)) blocked.push("A shooting has frozen arrivals for " + Math.ceil((st.shootingUntil || 0) - st.day) + " more days.");
+  if ((st.tsuiWar || 0) > 0 && st.day < st.tsuiWar + 40) blocked.push("The feud with the family has frozen arrivals.");
+  const pct = (l, m) => { if (Math.abs(m - 1) >= 0.005) rows.push([l, Math.round((m - 1) * 100)]); };
+  rows.push(["Base rate from mood", Math.round((0.22 + hap / 100) * 100) / 100]);
+  pct(`Tax policy: ${T.name}`, T.growth || 1);
+  if (CM) pct(`${CM.name}, communications`, CM.growth || 1);
+  if (EV && EV.growth) pct(`Event: ${EV.name}`, EV.growth);
+  pct("Tommy's Hideaway", d.hideawayOn ? 1.12 : 1);
+  pct("Sunday attendance", st.faithStance === "attend" ? 0.94 : 1);
+  pct("Schooling", 1 + Math.min(0.35, 0.06 * (d.learning || 0)));
+  pct("ICE in the city", st.ice === 2 ? ICE_GROWTH : 1);
+  return { rows, blocked };
+}
+
+// What the air is answering to.
+function envRows(d) {
+  const rows = [];
+  const push = (l, v) => { if (Math.abs(v) >= 0.05) rows.push([l, v]); };
+  push("Clean slate", 100);
+  push(`Factories (${d.envStacks || 0})`, -7 * (d.envStacks || 0));
+  push(`Power plants (${d.envPlants || 0})`, -9 * (d.envPlants || 0));
+  push(`Prisons (${d.envPrisons || 0})`, -3 * (d.envPrisons || 0));
+  push("Traffic", -24 * (d.traffic || 0));
+  push(`Parks and woodland (${d.envGreen || 0})`, 4 * (d.envGreen || 0));
+  push(`Transit stops (${d.envTransit || 0})`, 1.5 * (d.envTransit || 0));
+  return rows;
+}
+
 function calcHap(pop, d, mafia, crime) {
   const fp = Math.floor(pop);
   const unemp = fp > 0 ? Math.max(0, (fp - d.jobs) / fp) * 32 * Math.min(1, fp / 12) : 0;
@@ -2508,11 +2580,11 @@ function step(prev) {
   if (d.theatreOn) notes.push("🎭 Theatre");
   if (prev.faithStance === "refuse") notes.push("⛪ church tax");
   if (T.taxRate !== TAX.normal.taxRate) notes.push(`${T.icon} ${T.name}`);
+  const grant = fedGrantOf(prev, pop);
   const entry = { day, taxes, trade: d.revenue, goods: d.goods, power: -d.upPower,
-    industry: -d.upIndustry, civic: -d.upCivic, mob: mafiaMoney, windfall, notes };
+    industry: -d.upIndustry, civic: -d.upCivic, mob: mafiaMoney, windfall, grant, notes };
   const ledger = [...(prev.ledger || []), entry].slice(-7);
 
-  const grant = fedGrantOf(prev, pop);
   const net = taxes + d.revenue + d.goods - d.upkeep + mafiaMoney + windfall + grant;
 
   // Streaks of unanswered trouble. A new mayor finds out a fortnight before the
@@ -2919,6 +2991,7 @@ export default function Luckhead() {
   const [lawyerPanel, setLawyerPanel] = useState(false);
   const [commsPanel, setCommsPanel] = useState(false);
   const [crimeReport, setCrimeReport] = useState(false);
+  const [statPanel, setStatPanel] = useState(null);   // 'approval' | 'mood' | 'growth' | 'env'
   const [chiefPanel, setChiefPanel] = useState(false);
   const [bribePanel, setBribePanel] = useState(false);
   const [prPanel, setPrPanel] = useState(false);
@@ -4715,18 +4788,34 @@ export default function Luckhead() {
               )}
 
               {/* the three numbers you actually watch, big enough to read */}
-              <div style={{ display: "flex", gap: 6, margin: "12px 0 4px" }}>
-                {[["APPROVAL", `${Math.round(st.approval)}%`, st.approval >= 51 ? C.green : C.red],
-                  ["CRIME", `${Math.round(st.crime)}`, st.crime >= 60 ? C.red : st.crime >= 30 ? C.amber : C.green],
-                  ["ENVIRON", `${Math.round(st.env === undefined ? 100 : st.env)}`,
-                    (st.env === undefined ? 100 : st.env) < ENV_ALARM ? C.red : (st.env === undefined ? 100 : st.env) < 55 ? C.amber : C.green],
-                ].map(([lab, val, col]) => (
-                  <div key={lab} style={{ flex: 1, background: C.bg, borderRadius: 10, padding: "8px 6px", textAlign: "center" }}>
-                    <div style={{ ...disp, fontSize: 20, color: col, lineHeight: 1.1 }}>{val}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "12px 0 4px" }}>
+                {(() => {
+                  const envNow = Math.round(st.env === undefined ? 100 : st.env);
+                  const g = growthRows(st, d, hap);
+                  const arrivals = g.blocked.length ? 0
+                    : (0.22 + hap / 100) * (TAX[st.tax] || TAX.normal).growth
+                      * (COMMS[st.commsId] ? COMMS[st.commsId].growth : 1)
+                      * (d.hideawayOn ? 1.12 : 1) * (st.faithStance === "attend" ? 0.94 : 1)
+                      * (1 + Math.min(0.35, 0.06 * (d.learning || 0))) * (st.ice === 2 ? ICE_GROWTH : 1);
+                  return [
+                    ["APPROVAL", `${Math.round(st.approval)}%`, st.approval >= 51 ? C.green : C.red, "approval"],
+                    ["CRIME", `${Math.round(st.crime)}`, st.crime >= 60 ? C.red : st.crime >= 30 ? C.amber : C.green, "crime"],
+                    ["MOOD", `${Math.round(hap)}`, hap >= 55 ? C.green : hap >= 40 ? C.amber : C.red, "mood"],
+                    ["ARRIVALS", g.blocked.length ? "\u2014" : `+${arrivals.toFixed(1)}`,
+                      g.blocked.length ? C.red : arrivals >= 0.7 ? C.green : C.amber, "growth"],
+                    ["ENVIRON", `${envNow}`, envNow < ENV_ALARM ? C.red : envNow < 55 ? C.amber : C.green, "env"],
+                  ];
+                })().map(([lab, val, col, key]) => (
+                  <div key={lab}
+                    onClick={() => { if (key === "crime") { setHallMenu(false); setCrimeReport(true); } else { setHallMenu(false); setStatPanel(key); } }}
+                    style={{ flex: "1 1 30%", background: C.bg, borderRadius: 10, padding: "8px 6px", textAlign: "center",
+                             cursor: "pointer", border: `1px solid ${C.line}` }}>
+                    <div style={{ ...disp, fontSize: 19, color: col, lineHeight: 1.1 }}>{val}</div>
                     <div style={{ ...mono, fontSize: 8, color: C.dim, letterSpacing: "0.12em" }}>{lab}</div>
                   </div>
                 ))}
               </div>
+              <div style={{ ...mono, fontSize: 9, color: C.dim, textAlign: "center", marginBottom: 2 }}>Tap any figure for what is behind it.</div>
 
               {groups.map(([head, rows]) => (
                 <div key={head} style={{ marginTop: 14 }}>
@@ -6429,6 +6518,85 @@ export default function Luckhead() {
       })()}
 
       {/* crime report */}
+      {statPanel && (() => {
+        const cfg = {
+          approval: { title: "APPROVAL", sub: `${Math.round(st.approval)}% today \u00b7 51% wins an election`,
+                      rows: approvalRows(st, d, hap), unit: "", foot: "TARGET" },
+          mood: { title: "TOWN MOOD", sub: `${Math.round(hap)} today \u00b7 under 45 nobody moves here, under 28 people leave`,
+                  rows: moodRows(st.pop, { ...d, env: st.env, grace: undefined, protestMood: d.protestMood }, st.mafia, st.crime), unit: "", foot: "MOOD" },
+          env: { title: "ENVIRONMENT", sub: `${Math.round(st.env === undefined ? 100 : st.env)} today \u00b7 under ${ENV_ALARM} the whole town notices`,
+                 rows: envRows(d), unit: "", foot: "TARGET" },
+        }[statPanel];
+        if (statPanel === "growth") {
+          const g = growthRows(st, d, hap);
+          return (
+            <div onClick={() => setStatPanel(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 62, padding: 16 }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: "min(90vw, 380px)", maxHeight: "86vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
+                <div style={{ ...disp, fontSize: 18 }}>WHO IS MOVING HERE</div>
+                <div style={{ ...mono, fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+                  Population {Math.floor(st.pop)} of {Math.floor(d.popCap)} housed
+                </div>
+                {g.blocked.length > 0 && (
+                  <>
+                    <div style={{ ...mono, fontSize: 9.5, color: C.red, letterSpacing: "0.18em", margin: "6px 0 3px" }}>NOBODY IS ARRIVING</div>
+                    {g.blocked.map((b) => (
+                      <div key={b} style={{ ...mono, fontSize: 10.5, color: C.red, padding: "2px 0", lineHeight: 1.4 }}>{b}</div>
+                    ))}
+                  </>
+                )}
+                <div style={{ ...mono, fontSize: 9.5, color: C.dim, letterSpacing: "0.18em", margin: "10px 0 3px" }}>WHAT SETS THE RATE</div>
+                {g.rows.map(([label, v], i) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0" }}>
+                    <span style={{ color: C.dim }}>{label}</span>
+                    <span style={{ color: i === 0 ? C.cream : v > 0 ? C.green : C.red }}>
+                      {i === 0 ? `${v}/day` : `${v > 0 ? "+" : ""}${v}%`}
+                    </span>
+                  </div>
+                ))}
+                <div style={{ display: "flex", marginTop: 10 }}>
+                  <span style={{ flex: 1 }} />
+                  <span onClick={() => setStatPanel(null)} style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.orange, color: C.ink, borderRadius: 9, padding: "6px 14px" }}>CLOSE</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        const up = cfg.rows.filter(([, v]) => v > 0);
+        const down = cfg.rows.filter(([, v]) => v < 0);
+        const net = cfg.rows.reduce((a, [, v]) => a + v, 0);
+        return (
+          <div onClick={() => setStatPanel(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 62, padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "min(90vw, 380px)", maxHeight: "86vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
+              <div style={{ ...disp, fontSize: 18 }}>{cfg.title}</div>
+              <div style={{ ...mono, fontSize: 10.5, color: C.dim, marginBottom: 10 }}>{cfg.sub}</div>
+              <div style={{ ...mono, fontSize: 9.5, color: C.green, letterSpacing: "0.18em", margin: "6px 0 3px" }}>LIFTING IT</div>
+              {up.length === 0 && <div style={{ ...mono, fontSize: 10.5, color: C.dim, padding: "2px 0" }}>Nothing at all.</div>}
+              {up.map(([label, v]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0" }}>
+                  <span style={{ color: C.dim }}>{label}</span><span style={{ color: C.green }}>+{v.toFixed(1)}</span>
+                </div>
+              ))}
+              <div style={{ ...mono, fontSize: 9.5, color: C.red, letterSpacing: "0.18em", margin: "8px 0 3px" }}>HOLDING IT DOWN</div>
+              {down.length === 0 && <div style={{ ...mono, fontSize: 10.5, color: C.dim, padding: "2px 0" }}>Nothing at all.</div>}
+              {down.map(([label, v]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0" }}>
+                  <span style={{ color: C.dim }}>{label}</span><span style={{ color: C.red }}>{v.toFixed(1)}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 8, paddingTop: 8, display: "flex", ...mono, fontSize: 11 }}>
+                <span style={{ color: C.dim }}>{cfg.foot}</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ color: C.cream }}>{Math.round(net)}</span>
+              </div>
+              <div style={{ display: "flex", marginTop: 10 }}>
+                <span style={{ flex: 1 }} />
+                <span onClick={() => setStatPanel(null)} style={{ ...disp, cursor: "pointer", fontSize: 13, background: C.orange, color: C.ink, borderRadius: 9, padding: "6px 14px" }}>CLOSE</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {crimeReport && (() => {
         const rows = crimeLedgerRows({ mafia: st.mafia, reprisal: st.reprisal, testified: st.testified,
           rigged: st.rigged, pop: st.pop, backroom: st.backroom, fund: st.fund, heir: st.heir,
@@ -6729,13 +6897,17 @@ export default function Luckhead() {
           ["Civic", "civic", C.red],
           ["Tsui family", "mob", C.amber],
           ["Windfalls", "windfall", C.green],
+          ["Federal grant", "grant", C.green],
         ];
         const L = st.ledger || [];
         const sum = (k) => L.reduce((a, e) => a + (e[k] || 0), 0);
-        const income = sum("taxes") + sum("trade") + sum("goods") + sum("windfall") + Math.max(0, sum("mob"));
+        const income = sum("taxes") + sum("trade") + sum("goods") + sum("windfall") + sum("grant") + Math.max(0, sum("mob"));
         const expense = -(sum("power") + sum("industry") + sum("civic") + Math.min(0, sum("mob")));
         const total = income - expense;
-        const scale = Math.max(1, ...rows.map((r) => Math.abs(sum(r[1]))));
+        const peak = Math.max(1, ...rows.map((r) => Math.abs(sum(r[1]))));
+        const mag = Math.pow(10, Math.floor(Math.log10(peak)));
+        const lead = peak / mag;
+        const scale = (lead <= 1 ? 1 : lead <= 2 ? 2 : lead <= 5 ? 5 : 10) * mag;
         return (
           <div onClick={() => setBooks(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 55 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "min(90vw, 380px)", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
