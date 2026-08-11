@@ -93,14 +93,14 @@ const BUILD = {
   factory: { name: "Factory",     cost: 340, icon: "🏭", pow: 2, jobs: 10, upkeep: 5, rev: 25, pollute: true, hint: "Big industrial income, 10 jobs. Pollutes 2 tiles hard. Takes 9 days to build." },
   plant:   { name: "Power Plant", cost: 260, icon: "⚡", gen: 10, jobs: 1, upkeep: 12, pollute: true, hint: "Powers 10 units across its wires. Needs 1 operator. Pollutes 2 tiles; keeps running while upgrading." },
   park:    { name: "Park",        cost: 40,  icon: "🌳", upkeep: 1, hint: "Lifts mood for homes within 2 tiles. No road, power, or staff needed." },
-  tavern:  { name: "Tavern",      cost: 90,  icon: "🍺", pow: 1, jobs: 2, rev: 6, hint: "Cheer townwide, but +2 crime and adjacent homes lose 9 mood." },
+  tavern:  { name: "Tavern",      cost: 90,  icon: "🍺", pow: 1, jobs: 2, rev: 4, hint: "Cheer townwide, but +2 crime and adjacent homes lose 9 mood." },
   church:  { name: "Church",      cost: 110, icon: "⛪", pow: 1, jobs: 2, upkeep: 3, faith: 1.3, hint: "Quiets crime townwide (-1.3/day), at a small cost to the town\u2019s mood. Loudspeakers within 2 tiles drown it out entirely. Maximum of 3." },
   police:  { name: "Police",      cost: 120, icon: "🚓", pow: 1, jobs: 4, upkeep: 9, hint: "Cuts crime within 3 tiles. 4 officers. Coverage scales with staffing, and sharpens a lot once the chief has new equipment." },
   camera:  { name: "Cameras",     cost: 105, icon: "📷", pow: 3, upkeep: 4, watch: 0.6, reach: 2,
     hint: "Watches 2 tiles in every direction, cutting crime where no patrol reaches. No staff and no road needed, but a heavy power draw, and the town does not love being filmed." },
   school:  { name: "School",      cost: 130, icon: "🏫", pow: 1, jobs: 4, upkeep: 5, learn: 1, hint: "Draws newcomers, +approval, -0.6 crime, and raises the tax take from homes within 3 tiles. Maximum of 2." },
   mansion: { name: "Governor's Mansion", cost: 740, icon: "\uD83C\uDFDB\uFE0F", pow: 3, jobs: 5, upkeep: 26,
-    hint: "Fosters a closer relationship with Governor Sonny Sanders as long as you keep the tax policy aligned with his, and provides a wonderful field trip destination for local schools. One only." },
+    hint: "Needs to stand inside a police beat or the state will not use it. Fosters a closer relationship with Governor Sonny Sanders as long as you keep the tax policy aligned with his, and provides a wonderful field trip destination for local schools. One only." },
   histcenter:{ name: "History Center", cost: 420, icon: "🏛", pow: 2, jobs: 4, upkeep: 11, edu: 0.6,
     hint: "An archive, a reading room, and the town's own story under one roof. Sharpens every school in Luckhead. Needs 4 staff." },
   stadium: { name: "Stadium",     cost: 1400, icon: "🏟️", pow: 4, jobs: 10, upkeep: 20, rev: 120, crime: 4,
@@ -147,9 +147,9 @@ const UPGRADES = {
   park:    [{ name: "Playground",      cost: 45,  set: { mood: 14, upkeep: 2 } },
             { name: "Botanical Garden",cost: 90,  set: { mood: 19, upkeep: 3 } },
             { name: "Central Park",    cost: 170, set: { mood: 25, upkeep: 5 } }],
-  tavern:  [{ name: "Alehouse",        cost: 95,  set: { jobs: 3, rev: 11, cheer: 3 } },
-            { name: "Music Hall",      cost: 170, set: { jobs: 5, rev: 18, cheer: 5, pow: 2 } },
-            { name: "Grand Saloon",    cost: 290, set: { jobs: 7, rev: 27, cheer: 7, pow: 2 } }],
+  tavern:  [{ name: "Alehouse",        cost: 95,  set: { jobs: 3, rev: 8, cheer: 3 } },
+            { name: "Music Hall",      cost: 170, set: { jobs: 5, rev: 13, cheer: 5, pow: 2 } },
+            { name: "Grand Saloon",    cost: 290, set: { jobs: 7, rev: 19, cheer: 7, pow: 2 } }],
   church:  [{ name: "Parish Hall",     cost: 120, set: { jobs: 3, upkeep: 4, faith: 2.3 } },
             { name: "Cathedral",       cost: 220, set: { jobs: 5, upkeep: 6, faith: 5, pow: 2 } },
             { name: "Basilica",        cost: 380, set: { jobs: 7, upkeep: 8, faith: 7, pow: 2 } }],
@@ -380,6 +380,12 @@ const GOV_QUOTES = [
     who: "Benito Mussolini", src: "Attributed" },
   { text: "When the burdens of the presidency seem unusually heavy, I always remind myself it could be worse. I could be a mayor.",
     who: "Lyndon B. Johnson", src: "" },
+  { text: "It makes no difference if I burn my bridges behind me. I never retreat.",
+    who: "Fiorello La Guardia", src: "Mayor of New York, 1934 to 1945" },
+  { text: "Chicago is the largest city in the country without mayoral term limits. This has led to entrenched leaders, a lack of new ideas and creative thinking, and a city government that works for the few, not the many.",
+    who: "Lori Lightfoot", src: "Mayor of Chicago, 2019 to 2023" },
+  { text: "I'm serving people. I'm saving taxpayers money. And you know what, I made mistakes. What can I say? I made a mistake, I'm human.",
+    who: "Rob Ford", src: "Mayor of Toronto, at a toy drive, 2013" },
 ];
 
 const FLAVOR = [
@@ -1294,6 +1300,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   let billboardMsg = 0;   // accumulated in pass 1; folded into message below
   let upPower = 0, upIndustry = 0, upCivic = 0, goods = 0, smuggling = 0;
   let guard = null, hallJobs = 0, mansionOn = false;
+  const mansions = [];
   let anyDisc = false, anyUnwired = false, anyOverload = false, anyUnstaffed = false, plantBuilt = false, anyBuilding = false;
   const parks = [], houses = [];
 
@@ -1538,7 +1545,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
         schoolCov.push([r, c, b.reach || SCHOOL_REACH, crew]);
       }
     }
-    if (cell.type === "mansion") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu; mansionOn = true; }
+    if (cell.type === "mansion") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu; mansionOn = true; mansions.push([i, r, c]); }
     if (cell.type === "histcenter") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu; eduBuff += (b.edu || 0.35) * crew; }
     if (cell.type === "stadium") { jobs += b.jobs; upkeep += indUp(b.upkeep); upIndustry += indUp(b.upkeep);
       revenue += Math.round((b.rev || 0) * smogPenalty * crew * leisure * entRevMul);
@@ -1719,6 +1726,13 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   // Same computation as police coverage: each house takes the strength of its
   // best nearby school, never the sum, so a second school over already-covered
   // ground adds nothing. The targets are houses only, not every building.
+  // The Governor's Mansion only operates inside a police beat. This is
+  // coverage rather than adjacency, so a station a few streets away will do.
+  mansions.forEach(([i, mr, mc]) => {
+    const covered = cops.some(([pr, pc, reach]) => Math.abs(pr - mr) + Math.abs(pc - mc) <= reach);
+    if (!covered) { status[i].functioning = false; status[i].unpoliced = true; mansionOn = false; }
+  });
+
   let schoolFrac = 0;
   if (houses.length) {
     let covered = 0;
@@ -3427,6 +3441,7 @@ export default function Luckhead() {
       ? `${labelOf(cell)}: upgrading, ${cell.build} day${cell.build > 1 ? "s" : ""} to go. Running at the previous tier meanwhile.`
       : `${labelOf(cell)}: under construction, ${cell.build} day${cell.build > 1 ? "s" : ""} to go.`;
     if (s.unguarded) return `${labelOf(cell)}: closed. It will not open without a working Police Station on an adjacent tile.`;
+    if (s.unpoliced) return `${labelOf(cell)}: shut up and empty. The state will not use a residence outside a police beat. Bring a Station's coverage to it.`;
     const pct = s.crew === undefined ? 1 : s.crew;
     const state = !s.connected ? "no road access" : !s.powered ? "no power"
       : pct <= 0 ? "no staff at all, closed"
@@ -3701,7 +3716,7 @@ export default function Luckhead() {
       if (cell.build > 0) badge = ["🔨", C.cream];
       else if (!s.connected) badge = ["🚧", C.amber];
       else if (!s.powered) badge = ["⚡", C.red];
-      else if (s.unguarded) badge = ["👮", C.red];
+      else if (s.unguarded || s.unpoliced) badge = ["👮", C.red];
       else if (s.crew !== undefined && s.crew <= 0) badge = ["👤", C.red];
       else if (!s.staffed) badge = ["👤", C.amber];
       else if (s.smog >= 2) badge = ["☣️", C.red];
