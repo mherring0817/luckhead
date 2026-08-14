@@ -406,6 +406,29 @@ const FLAVOR = [
   "The pigeons approve of the new perches.",
 ];
 
+// Three ways to run Luckhead. Chosen once, at the door.
+const MAYORS = {
+  jenkins: { name: "Mayor Jenkins", icon: "🎩",
+    blurb: "The Jenkins name is notorious in Luckhead. With the influence comes baggage, but the family has learned some tricks along the way.",
+    effects: ["Starts in business with the Tsui family: a flat $20 a day, and Vincent never renegotiates",
+              "Federal heat builds 35% slower",
+              "The family name keeps crime a little warmer"],
+    heat: 0.65, crimeRow: 1.2 },
+  mulaney: { name: "Mayor Mulaney", icon: "🤵",
+    blurb: "Charismatic and big business. His don't-rock-the-boat attitude plays well in every room.",
+    effects: ["+2 approval, always",
+              "Industrial revenue +10%",
+              "Starts at +1 standing with the Governor"],
+    ind: 1.1, approval: 2, govRel: 1 },
+  debbs: { name: "Mayor Debbs", icon: "✊",
+    blurb: "A firebrand with a leftward lean. The program is the program, and the program is not negotiable.",
+    effects: ["Tax policy locked to High Tax",
+              "Commercial and industrial revenue -10%",
+              "Clinics, hospitals, schools, transit, loudspeakers and billboards all work 25% better",
+              "The city runs visibly well: a standing mood bump that softens the tax bite"],
+    ind: 0.9, shop: 0.9, care: 1.25, learn: 1.25, msg: 1.25, relief: 1.25, mood: 4, taxLock: "high" },
+};
+
 const TSUI_LOAN_TRIGGER = 500;   // treasury low-water mark that brings the offer
 const TSUI_LOAN_AMOUNT = 2000;
 const TSUI_LOAN_DAYS = 90;       // how long the force stays gutted afterward
@@ -717,6 +740,7 @@ function approvalRows(S, d, hap) {
   if (S.schoolDemand === 2) push("No school in Luckhead", -SCHOOL_DEMAND_HIT);
   if (S.protest === 2) push("Stood against harsh policing", 3);
   if (S.protest === 3) push("Defended the police's tactics", -2);
+  if (MAYORS[S.mayor] && MAYORS[S.mayor].approval) push("Mayor Mulaney's steady hand", MAYORS[S.mayor].approval);
   if (S.slander === 3 && S.day < (S.slanderUntil || 0)) push("Told Washington where to go", 4);
   if (S.slander === 2 && S.day < (S.slanderUntil || 0)) push("Agreed Luckhead is a dump", -3);
   if (S.rally === 2) push("Hosted the President's rally", -4);
@@ -755,6 +779,7 @@ function crimeLedgerRows(S, d) {
   const EV = eventById(S.event);
   const rows = [];
   const push = (label, v) => { if (Math.abs(v) >= 0.01) rows.push([label, v]); };
+  if (MAYORS[S.mayor] && MAYORS[S.mayor].crimeRow) push("The Jenkins name", MAYORS[S.mayor].crimeRow);
   if (S.mafia === "refused") push("War with the Tsui family", 5);
   else if (S.mafia === "allied") push("The Tsui presence", 1);
   if (S.reprisal > 0) push("Tsui reprisals", 7);
@@ -1382,7 +1407,7 @@ function freshState(seed, diff) {
     govAsk: 0, govAskDay: 0, govBuiltDay: 0, govTraffic: 1, churchGov: 1, churchGovUntil: 0, works: "balanced", lawyerId: null, lawyerOffer: 0, lawyerFrom: 0,
     fedFavor: 0, lawyerLocked: 0, potus: 0, judyUntil: 0, judySeen: 0, commsId: null,
     feud: 0, marla: 0, marlaCool: 0, commsLocked: 0, rally: 0, stadiumDay: 0, slander: 0, slanderUntil: 0, slanderCool: 0, schoolAudit: 0, sSchool: 0, schoolNotice: 0, staffOffer: 0, govYes: 0, freeLandmark: 0, freeApartment: 0, buyoutFailed: 0, everRefused: 0, everAllied: 0,
-    sIdle: 0, sRed: 0, sDisc: 0, sPower: 0, tsuiHush: 0, tsuiBound: 0, golfAsk: 0, golfUntil: 0, statueOffer: 0, eco: 0, ecoUntil: 0, ecoCool: 0, ecoParks: 0, speakerDown: 0, speakerUntil: 0, speakerCool: 0, tsuiLoan: 0, tsuiLoanUntil: 0, tsuiLoanCool: 0, tsuiLoanTook: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
+    sIdle: 0, sRed: 0, sDisc: 0, sPower: 0, mayor: null, tsuiHush: 0, tsuiBound: 0, golfAsk: 0, golfUntil: 0, statueOffer: 0, eco: 0, ecoUntil: 0, ecoCool: 0, ecoParks: 0, speakerDown: 0, speakerUntil: 0, speakerCool: 0, tsuiLoan: 0, tsuiLoanUntil: 0, tsuiLoanCool: 0, tsuiLoanTook: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
 }
 
 const rc = (i) => [Math.floor(i / SIZE), i % SIZE];
@@ -1415,6 +1440,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   const T = TAX[taxKey] || TAX.normal;
   const F = FUND[fundKey] || FUND.normal;
   const WK = WORKS[flags.works] || WORKS.balanced;
+  const MY = MAYORS[flags.mayor] || {};
   const upkeepMul = flags.upkeepMul || 1;
   const civicCost = (n) => Math.round(n * (T.civic ?? 1) * upkeepMul);
   const indUp = (n) => Math.round(n * upkeepMul);
@@ -1507,7 +1533,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
       if (cell.build > 0) { status[i] = { connected: true, powered: true, functioning: false, staffed: true, building: true }; anyBuilding = true; return; }
       const bb = statsOf(cell); status[i] = { connected: true, powered: true, functioning: !flags.graffiti, staffed: true };
       const bu = civicCost(bb.upkeep); upkeep += bu; upCivic += bu;
-      if (!flags.graffiti) billboardMsg += (bb.message || 0.75) * (flags.campaign ? 1.3 : 1);
+      if (!flags.graffiti) billboardMsg += (bb.message || 0.75) * (flags.campaign ? 1.3 : 1) * (MY.msg || 1);
       return;
     }
     if (cell.type === "golf") {
@@ -1693,7 +1719,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     if (cell.type === "house") { popCap += b.cap; houses.push([r, c]); targets.push([r, c]); }
     if (cell.type === "shop") { jobs += b.jobs; shops.push([i, b.rev || 0, smogPenalty * crew * shopRevMul]); targets.push([r, c]); }
     if (cell.type === "factory") { jobs += b.jobs; upkeep += indUp(b.upkeep); upIndustry += indUp(b.upkeep);
-      goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1) * highwayTrade * (flags.commsTrade || 1)); if (cell.smuggle) smuggling += 1;
+      goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1) * highwayTrade * (flags.commsTrade || 1) * (MY.ind || 1)); if (cell.smuggle) smuggling += 1;
       factories.push([r, c, indUp(b.upkeep)]); targets.push([r, c]); }
     if (cell.type === "police") { const cu = Math.round(civicCost(b.upkeep) * F.upkeep * (flags.copWage || 1));
       jobs += Math.max(1, b.jobs + F.staff + chiefStaff);
@@ -1737,7 +1763,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
       revenue += Math.round(b.rev * smogPenalty * crew * leisure * venueRevMul * entRevMul); cheer += (b.cheer || 6) * smogPenalty * crew * leisure; rowdiness += (b.rowdy || 2.5) * crew;
       venues.push([r, c]); targets.push([r, c]); }
     if (cell.type === "speaker") { const cu = Math.round(civicCost(b.upkeep) * (flags.campaign ? 2 : 1));
-      upkeep += cu; upCivic += cu; message += (b.message || 1) * (flags.campaign ? 1.3 : 1); }
+      upkeep += cu; upCivic += cu; message += (b.message || 1) * (flags.campaign ? 1.3 : 1) * (MY.msg || 1); }
     if (cell.type === "golf") { const gu = civicCost(b.upkeep); jobs += b.jobs; upkeep += gu; upCivic += gu;
       cheer += (b.cheer || 10) * crew * leisure;
       targets.push([r, c]); }
@@ -1751,16 +1777,16 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
       revenue += Math.round((b.rev || 0) * smogPenalty * crew); targets.push([r, c]); }
     if (cell.type === "bank") { jobs += b.jobs; upkeep += indUp(b.upkeep); upIndustry += indUp(b.upkeep); targets.push([r, c]); }
     if (cell.type === "clinic" || cell.type === "hospital") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu;
-      care += (b.care || 1) * smogPenalty * crew; medical.push([r, c]); }
+      care += (b.care || 1) * smogPenalty * crew * (MY.care || 1); medical.push([r, c]); }
     if (cell.type === "prison") { const cu = civicCost(b.upkeep); jobs += Math.max(1, b.jobs + chiefStaff); upkeep += cu; upCivic += cu; held += flags.riotOn ? 0 : (b.hold || 4) * crew * (flags.bustArrest ? 1.1 : 1) * copMul; if (b.gloom) prisons.push([r, c, b.gloom]); }
     if (cell.type === "bus" || cell.type === "subway") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu;
-      buses.push([r, c, (b.relief || 0.4) * crew * WK.transit, (b.relief || 0.4) * crew * WK.transit * (cell.type === "subway" ? 0.165 : 0.14)]); }
+      buses.push([r, c, (b.relief || 0.4) * crew * WK.transit * (MY.relief || 1), (b.relief || 0.4) * crew * WK.transit * (MY.relief || 1) * (cell.type === "subway" ? 0.165 : 0.14)]); }
   });
 
   // Libraries and the History Center sharpen every school. The buff scales the
   // learning already produced, capped so a stack of archives can't run away.
   const eduMul = 1 + Math.min(0.6, eduBuff);
-  learning = learning * eduMul;
+  learning = learning * eduMul * (MY.learn || 1);
 
   // Shop demand: the town supports one shop per 10 residents at full price.
   // Each shop past that captures a shrinking slice of what is left.
@@ -1780,7 +1806,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
       const mates = Math.min(3, shopAt.filter((p) => p[0] !== sr || p[1] !== sc).filter((p) => near(p) <= 2).length);
       const custom = Math.min(4, houses.filter((p) => near(p) <= 2).length);
       const district = (1 + 0.06 * mates + 0.05 * custom) * (flags.govTrade || 1) * (flags.commsTrade || 1);
-      const earned = Math.round(rev * share * smogPenalty * highwayTrade * district);
+      const earned = Math.round(rev * share * smogPenalty * highwayTrade * district * (MY.shop || 1));
       status[i].demand = share;
       status[i].earned = earned;
       status[i].mates = mates;
@@ -1995,7 +2021,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
            taverns: taverns.length, stadiumCrime, eduBuff, schoolCount: schools.length, cameras, churchWeight, churchCount: Math.round(churchWeight), loudChurches,
            highwayOn, mansionOn, statueUp,
            envTarget, env: flags.env === undefined ? START_ENV : flags.env,
-           commsMood: flags.commsMood || 0,
+           commsMood: flags.commsMood || 0, mayorMood: (MAYORS[flags.mayor] || {}).mood || 0,
            envStacks, envPlants, envPrisons, envGreen, envTransit,
            protestMood: flags.protestMood || 0, grace: flags.grace === undefined ? 1 : flags.grace, faith };
 }
@@ -2014,6 +2040,7 @@ function moodRows(pop, d, mafia, crime) {
   const gr = d.grace === undefined ? 1 : d.grace;
   push("Baseline", 56);
   if (d.commsMood) push("Communications director", d.commsMood);
+  if (d.mayorMood) push("Civic services", d.mayorMood);
   push("Environment", d.envAvg);
   push("Taverns", d.tavernMood);
   push("Clinics and hospitals", Math.min(10, 1.6 * (d.care || 0)));
@@ -2096,7 +2123,7 @@ function calcHap(pop, d, mafia, crime) {
   const hasSchool = (d.schoolCov || []).length > 0;
   const schoolGate = hasSchool && Math.floor(pop) >= (MILESTONE_POP.school || 26) ? 1 : 0;
   const schoolPain = schoolGate * SCHOOL_UNCOVERED_WEIGHT * (1 - Math.min(1, d.schoolFrac || 0)) * gr;
-  let h = 56 + (d.commsMood || 0) + d.envAvg + d.tavernMood + Math.min(10, 1.6 * (d.care || 0)) + (d.protestMood || 0) - unemp * gr - homeless * gr - piety - loudPenalty - envPain - 24 * (d.traffic || 0) - schoolPain;
+  let h = 56 + (d.commsMood || 0) + (d.mayorMood || 0) + d.envAvg + d.tavernMood + Math.min(10, 1.6 * (d.care || 0)) + (d.protestMood || 0) - unemp * gr - homeless * gr - piety - loudPenalty - envPain - 24 * (d.traffic || 0) - schoolPain;
   if (mafia === "allied") h -= 10;
   if (mafia === "refused") h -= (crime || 0) * 0.25;
   return Math.round(Math.min(100, Math.max(5, h)));
@@ -2129,7 +2156,7 @@ function step(prev) {
   const d = derive(prev.grid, Math.floor(prev.pop), prev.tax, prev.fund, prev.terrain, prev.heir, prev.event, { interstate: prev.interstate, works: prev.works, govTraffic: prev.govTraffic, mafia: prev.mafia, everRefused: prev.everRefused, testified: prev.testified, lawyerFee: LAWYERS[prev.lawyerId] ? LAWYERS[prev.lawyerId].fee : 0,
       commsFee: COMMS[prev.commsId] ? COMMS[prev.commsId].fee : 0, commsTrade: COMMS[prev.commsId] ? COMMS[prev.commsId].trade : 1,
       commsMood: COMMS[prev.commsId] ? COMMS[prev.commsId].mood : 0,
-      chiefFee: CHIEFS[prev.chiefId] ? (CHIEFS[prev.chiefId].salary || 0) : 0, govTrade: prev.govTrade, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, speakersDown: (prev.speakerDown || 0) === 1,
+      chiefFee: CHIEFS[prev.chiefId] ? (CHIEFS[prev.chiefId].salary || 0) : 0, govTrade: prev.govTrade, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, mayor: prev.mayor, speakersDown: (prev.speakerDown || 0) === 1,
       protestTraffic: ((prev.eco === 3 || prev.eco === 5) && prev.day < (prev.ecoUntil || 0)) ? 2 : 1, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
   const baseHap = calcHap(prev.pop, d, prev.mafia, prev.crime);
   const hap = baseHap + (H ? H.mood : 0) + (CHF ? CHF.mood : 0) + (EV && EV.mood ? EV.mood : 0);
@@ -2151,7 +2178,7 @@ function step(prev) {
   let tsuiReturn = prev.tsuiReturn || 0;
   if (mafia === "none" && tsuiReturn > 0 && prev.day + 1 >= tsuiReturn) { mafia = "choice"; tsuiReturn = 0; }
   else if (mafia === "none" && tsuiReturn === 0 && Math.floor(pop) >= MAFIA_POP) mafia = "choice";
-  if (mafia === "allied") mafiaMoney = kickbackFor(prev.deal, prev.rigged) + (prev.backroom ? 10 : 0);
+  if (mafia === "allied") mafiaMoney = (prev.mayor === "jenkins" ? 20 : kickbackFor(prev.deal, prev.rigged)) + (prev.backroom ? 10 : 0);
 
   // Crime exists in every state. The mob just makes it much worse.
   const reprisal = prev.reprisal > 0 ? prev.reprisal - 1 : 0;
@@ -2235,7 +2262,7 @@ function step(prev) {
       }
     }
   }
-  if (mafia === "allied" && prev.nextTalk > 0 && day >= prev.nextTalk) mafia = "renegotiate";
+  if (mafia === "allied" && prev.mayor !== "jenkins" && prev.nextTalk > 0 && day >= prev.nextTalk) mafia = "renegotiate";
   // Federal heat. Opens once you are deep enough in, then tracks how visible
   // the arrangement is: more deals and more crime mean faster.
   const ties = entanglements({ ...prev, mafia });
@@ -2250,7 +2277,7 @@ function step(prev) {
     if (fedComplete(prev) && (prev.fedFavor || 0) >= 3) { heat = 0; fed = 0; }
     const settled = prev.lawyerId && day >= (prev.lawyerFrom || 0) + LAWYER_HANDOVER;
     const shield = (prev.govShield ? 0.6 : 1) * (settled ? LAWYERS[prev.lawyerId].heat : 1);
-    const exposure = (0.32 * ties + crime / 90) * DP.crime.heat * (prev.viral === 1 ? 1.4 : 1) * shield;
+    const exposure = (0.32 * ties + crime / 90) * DP.crime.heat * (prev.viral === 1 ? 1.4 : 1) * shield * (MAYORS[prev.mayor] ? (MAYORS[prev.mayor].heat || 1) : 1);
     // Defences slow the file but never close it: the deals are the evidence.
     const cool = Math.min(exposure * 0.75,
       0.09 * (d.held || 0) + 0.35 * (d.policeFrac || 0)
@@ -3262,6 +3289,7 @@ export default function Luckhead() {
   const [booted, setBooted] = useState(false);
   const [needsDiff, setNeedsDiff] = useState(false);
   const [pickDiff, setPickDiff] = useState(DEFAULT_DIFF);
+    const [pickMayor, setPickMayor] = useState("mulaney");
   const [pickHints, setPickHints] = useState(true);
   const [pickDictator, setPickDictator] = useState(false);
   const [showHall, setShowHall] = useState(false);
@@ -3376,14 +3404,14 @@ export default function Luckhead() {
   const d = useMemo(() => derive(st.grid, Math.floor(st.pop), st.tax, st.fund, st.terrain, st.heir, st.event, { interstate: st.interstate, works: st.works, govTraffic: st.govTraffic, mafia: st.mafia, everRefused: st.everRefused, testified: st.testified, lawyerFee: LAWYERS[st.lawyerId] ? LAWYERS[st.lawyerId].fee : 0,
       commsFee: COMMS[st.commsId] ? COMMS[st.commsId].fee : 0, commsTrade: COMMS[st.commsId] ? COMMS[st.commsId].trade : 1,
       commsMood: COMMS[st.commsId] ? COMMS[st.commsId].mood : 0,
-      chiefFee: CHIEFS[st.chiefId] ? (CHIEFS[st.chiefId].salary || 0) : 0, govTrade: st.govTrade, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, speakersDown: (st.speakerDown || 0) === 1,
+      chiefFee: CHIEFS[st.chiefId] ? (CHIEFS[st.chiefId].salary || 0) : 0, govTrade: st.govTrade, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, mayor: st.mayor, speakersDown: (st.speakerDown || 0) === 1,
       protestTraffic: ((st.eco === 3 || st.eco === 5) && st.day < (st.ecoUntil || 0)) ? 2 : 1, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
   const hap = calcHap(st.pop, d, st.mafia, st.crime);
   const fp = Math.floor(st.pop);
   const employed = Math.min(fp, d.jobs);
   const kick = kickbackFor(st.deal, st.rigged);
   const newKick = kickbackFor(st.deal + 1, st.rigged);
-  const mafiaMoney = st.mafia === "allied" ? kick : st.mafia === "refused" ? -Math.round(st.crime / 6) : 0;
+  const mafiaMoney = st.mafia === "allied" ? (st.mayor === "jenkins" ? 20 : kick) : st.mafia === "refused" ? -Math.round(st.crime / 6) : 0;
   const fedGrant = fedGrantOf(st, fp);
   const stateGrant = govGrantOf(st, fp);
   const net = Math.round(fp * T.taxRate * HEAD_TAX) + d.revenue + d.goods - d.upkeep + mafiaMoney + fedGrant + stateGrant;
@@ -3698,7 +3726,11 @@ export default function Luckhead() {
     // Keep whatever theme is already playing; a new game should not interrupt
     // the song the title screen started on. Only a re-election changes it.
     const keepSet = st.musicSet;
-    const next = { ...freshState(seed, diff || pickDiff), hintsOn: pickHints, musicSet: keepSet, dictator: pickDictator };
+    const next = { ...freshState(seed, diff || pickDiff), hintsOn: pickHints, musicSet: keepSet, dictator: pickDictator,
+        mayor: pickMayor,
+        ...(pickMayor === "jenkins" ? { mafia: "allied", everAllied: 1 } : {}),
+        ...(pickMayor === "mulaney" ? { govRel: 1 } : {}),
+        ...(pickMayor === "debbs" ? { tax: "high" } : {}) };
     lastSave.current = Date.now();
     saveGame(next);
     setSt(next);
@@ -4226,6 +4258,31 @@ export default function Luckhead() {
           </div>
           <div style={{ ...mono, fontSize: 11, color: C.dim, marginBottom: 18, lineHeight: 1.5 }}>
             Set the terms of your administration. Each dial is independent, and harder settings are worth more when the history books are written. You cannot change these once the city opens.
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ ...disp, fontSize: 14, letterSpacing: "0.1em", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+              <span>🗳️</span><span>THE CANDIDATE</span>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {Object.entries(MAYORS).map(([k, M]) => {
+                const on = pickMayor === k;
+                return (
+                  <div key={k} onClick={() => setPickMayor(k)}
+                    style={{ flex: 1, cursor: "pointer", padding: "8px 6px", borderRadius: 10, textAlign: "center",
+                             background: on ? C.bg : "transparent", border: `1px solid ${on ? C.orange : C.line}` }}>
+                    <div style={{ fontSize: 17 }}>{M.icon}</div>
+                    <div style={{ ...disp, fontSize: 11.5, color: on ? C.orange : C.cream, marginTop: 2 }}>{M.name}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ ...mono, fontSize: 9.5, color: C.dim, marginTop: 5, lineHeight: 1.45 }}>
+              {MAYORS[pickMayor].blurb}
+            </div>
+            <div style={{ ...mono, fontSize: 9, color: C.amber, marginTop: 4, lineHeight: 1.5 }}>
+              {MAYORS[pickMayor].effects.map((e, i) => <span key={i} style={{ display: "block" }}>· {e}</span>)}
+            </div>
           </div>
 
           {cats.map(([key, title, icon]) => (
@@ -7525,7 +7582,8 @@ export default function Luckhead() {
               return (
                 <div
                   key={k}
-                  onClick={() => { setSt((s) => ({ ...s, tax: k })); setNote(`Tax policy set to ${t.name}.`); }}
+                  onClick={() => { if (st.mayor === "debbs") { setNote("Debbs ran on High Tax. The platform is not negotiable."); return; }
+                                   setSt((s) => ({ ...s, tax: k })); setNote(`Tax policy set to ${t.name}.`); }}
                   style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 11, cursor: "pointer",
                            background: on ? C.bg : "transparent", border: `1px solid ${on ? C.orange : C.line}` }}
                 >
