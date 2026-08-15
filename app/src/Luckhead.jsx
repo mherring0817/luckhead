@@ -241,12 +241,12 @@ function scoreMult(diff) {
 const HEAD_TAX = 1.15;       // residents pay slightly better than they used to
 const COST_SCALE = 1.12;
 const LOAN_PENALTY = 0.05;   // each loan raises build costs 5%, permanently
-const GRAFT_PENALTY = 0.12;  // score lost per dollar of Tsui money taken
+const GRAFT_PENALTY = 0.07;  // score lost per dollar of Tsui money taken
 const DEBT_FLOOR = -3000;    // past this the state takes the city off your hands
 const MODAL_GAP = 7;         // quiet days after something that could end the run
 const MODAL_GAP_SOFT = 17;   // and a longer breather after routine business
 // Interruptions that genuinely cannot wait. Everything else is business.
-const URGENT_MODALS = new Set(["heir", "vote", "fed", "indict", "chief", "arson", "shooting", "tsuiloan", "hush", "potus", "audit", "rally", "slander", "marla"]);
+const URGENT_MODALS = new Set(["heir", "vote", "fed", "indict", "chief", "arson", "shooting", "tsuiloan", "hush", "potus", "audit", "rally", "slander", "marla", "votes"]);
 const costOf = (t, taxKey, banks = 0, loans = 0, costMul = 1) => {
   const base = Math.round(BUILD[t].cost * COST_SCALE * costMul * (1 + LOAN_PENALTY * (loans || 0)) * (1 - 0.04 * Math.min(3, banks)));
   const T = TAX[taxKey] || TAX.normal;
@@ -412,20 +412,23 @@ const MAYORS = {
     blurb: "The Jenkins name is notorious in Luckhead. With the influence comes baggage, but the family has learned some tricks along the way.",
     effects: ["Starts in business with the Tsui family: a flat $20 a day, and Vincent never renegotiates",
               "Federal heat builds 35% slower",
-              "The family name keeps crime a little warmer"],
+              "The family name keeps crime a little warmer",
+              "Family loyalty: Leroy and Sylvester Jenkins both work harder for a brother"],
     heat: 0.65, crimeRow: 1.2 },
   mulaney: { name: "Mayor Mulaney", icon: "🤵",
     blurb: "Charismatic and big business. His don't-rock-the-boat attitude plays well in every room.",
     effects: ["Industrial revenue +10%",
-              "Starts at +1 standing with the Governor"],
-    ind: 1.1, govRel: 1 },
+              "Starts at +1 standing with the Governor",
+              "Nothing quite boils over: protests, strikes and public outcries are 30% rarer"],
+    ind: 1.1, govRel: 1, calm: 0.7 },
   debbs: { name: "Mayor Debbs", icon: "✊",
     blurb: "A firebrand with a leftward lean. The program is the program, and the program is not negotiable.",
     effects: ["Tax policy locked to High Tax",
               "Commercial and industrial revenue -10%",
               "Clinics, hospitals, schools, transit, loudspeakers and billboards all work 25% better",
-              "The city runs visibly well: a standing mood bump that softens the tax bite"],
-    ind: 0.9, shop: 0.9, care: 1.25, learn: 1.25, msg: 1.25, relief: 1.25, mood: 4, taxLock: "high" },
+              "The city runs visibly well: a standing mood bump that softens the tax bite",
+              "The President has decided she is a socialist: starts at -1 federal standing"],
+    ind: 0.9, shop: 0.9, care: 1.25, learn: 1.25, msg: 1.25, relief: 1.25, mood: 4, fedFavor: -1, taxLock: "high" },
 };
 
 const TSUI_LOAN_TRIGGER = 500;   // treasury low-water mark that brings the offer
@@ -509,7 +512,7 @@ const LAWYERS = {
   jenkins: { name: "Sylvester Jenkins", icon: "\uD83D\uDDDC\uFE0F",
     line: "Leroy Jenkins's brother. Files things where nobody looks, and does not ask what he is filing.",
     fee: 14, heat: 0.4, gov: 0, approval: -3, graftShield: 1, tsuiCover: 1,
-    effects: ["Federal heat builds 60% slower", "Sanders never hears about the family's money", "The arrangement stays out of the papers", "-3 approval, people talk", "$14 a day"] },
+    effects: ["Federal heat builds 60% slower", "Sanders never hears about the family's money", "The arrangement stays out of the papers", "-3 approval, people talk", "$14 a day", "With a Jenkins in City Hall: heat builds 70% slower"] },
   ginsberg: { name: "Judy Ginsberg", icon: "\uD83D\uDCD8",
     line: "By the book, every page, whether or not the book helps you.",
     fee: 6, heat: 0.9, gov: +1, approval: +4, graftShield: 0,
@@ -525,7 +528,8 @@ const FED_GRANT_WEIGHT = { "-2": 0.2, "-1": 0.5, "0": 1, "1": 1.8, "2": 2.6, "3"
 const FED_FAVOR_NAME = { "-2": "cut off", "-1": "reduced", "0": "standard", "1": "favoured", "2": "a personal friend", "3": "immune to federal scrutiny" };
 // Hosted, allowed ICE in, let him have Nace. Undo any one and the immunity is
 // gone; it was his patience, not a trophy that stays earned.
-const fedComplete = (st) => st.pvisit === 2 && st.ice === 2 && !!st.lawyerLocked;
+const fedComplete = (st) => st.stolenVotes === 2
+  || (st.pvisit === 2 && st.ice === 2 && !!st.lawyerLocked);
 const fedFavorOf = (st) => {
   const cap = fedComplete(st) ? 3 : FED_FAVOR_MAX;
   return Math.max(FED_FAVOR_MIN, Math.min(cap, st.fedFavor || 0));
@@ -610,7 +614,7 @@ const CHIEFS = {
     line: "Came up through the neighborhoods, knows everyone, owes most of them.",
     staff: +2, police: 1, entRev: 1, mood: 0, approval: -2, crime: 3, tsuiStations: 2,
     crimeLabel: "Chief Jenkins, looking the other way",
-    effects: ["Tsui family covers 2 stations' upkeep", "+2 staff needed at every Station and Prison", "+3 crime", "-2 approval", "Counts as a federal entanglement", "$6 a day"] },
+    effects: ["Tsui family pays the build cost AND upkeep of 2 Police Stations", "+2 staff needed at every Station and Prison", "+3 crime", "-2 approval", "Counts as a federal entanglement", "$6 a day", "With a Jenkins in City Hall: the family covers a third station"] },
   mcgurk: { name: "Dirk McGurk", icon: "🔨", salary: 15,
     line: "Kicks doors first. The doors have stopped complaining.",
     staff: 0, police: 1.15, entRev: 0.9, mood: 0, approval: -4, crime: 0,
@@ -722,7 +726,7 @@ function approvalRows(S, d, hap) {
   else if (govStanding <= -2) push("The statehouse is hostile", -5);
   if (S.govBacked && !S.tsuiBound) push("Sanders funds your rival", -GOV_BACKING_DRAG);
   if (S.tsuiBound && !(LAWYERS[S.lawyerId] || {}).tsuiCover) push("The arrangement holds", -2);
-  if (d.monumentCount) push(`Chief memorials (${d.monumentCount})`, Math.min(6, 2 * d.monumentCount));
+  if (d.monumentCount) push(`Chief memorials (${d.monumentCount})`, d.monumentCount);
   if (d.statueUp) push("The Unity Monument", 5);
   if (d.cameras) push(`Cameras watching (${d.cameras})`, -Math.min(5, 0.9 * d.cameras));
   if (S.blackmail === 3 && S.day < (S.blackmailUntil || 0) && !(LAWYERS[S.lawyerId] || {}).tsuiCover) push("The Tsuis are talking to reporters", -7);
@@ -742,11 +746,15 @@ function approvalRows(S, d, hap) {
   if (MAYORS[S.mayor] && MAYORS[S.mayor].approval) push("Mayor Mulaney's steady hand", MAYORS[S.mayor].approval);
   if (S.slander === 3 && S.day < (S.slanderUntil || 0)) push("Told Washington where to go", 4);
   if (S.slander === 2 && S.day < (S.slanderUntil || 0)) push("Agreed Luckhead is a dump", -3);
+  if (S.rallyMood && S.day < (S.rallyUntil || 0)) push("The town rallies together", S.rallyMood);
+  if (S.survOutcryUntil && S.day < S.survOutcryUntil) push("Outcry over the camera deal", -2);
+  if (S.stolenVotes === 2) push("Whispers about the recount", -3);
+  if (S.stolenVotes === 3) push("Said no to the recount men", 2);
   if (S.rally === 2) push("Hosted the President's rally", -4);
   if (S.rally === 3) push("Refused the President a stage", 3);
   if (S.eco === 3 && S.day < (S.ecoUntil || 0)) push("Environmental protests in the streets", -6);
   if (S.eco === 5 && S.day < (S.ecoUntil || 0)) push("Broke the environmental pledge", -8);
-  if (S.eco === 4) push("Kept the environmental pledge", 4);
+  if (S.eco === 4) push("Kept the environmental pledge", 7);
   const fpopA = Math.floor(S.pop || 0);
   const idleA = fpopA > 0 ? Math.max(0, (fpopA - (d.jobs || 0)) / fpopA) : 0;
   const gr = earlyGrace(S.day || 999);
@@ -1036,6 +1044,16 @@ const EVENTS = [
     // Washington gives to the towns it likes. Standing with the President moves
     // this from almost never to better than three times the usual odds.
     weight: (st) => FED_GRANT_WEIGHT[String(fedFavorOf(st))] },
+  { id: "terror", name: "Terrorist Attack", icon: "💥", days: 40,
+    body: "A local terrorist group destroyed a Power Plant overnight. The lights went out across the grid, and the town is demanding to feel safe again.",
+    tag: "One plant destroyed · policing demand up for 40 days", crime: 6, plantLost: true, disaster: true,
+    needs: (st) => (st.grid || []).some((c) => c && c.type === "plant" && !c.build),
+    weight: 0.55 },
+  { id: "terror2", name: "Stadium Attack", icon: "💥", days: 40,
+    body: "A local terrorist group bombed Luckhead Stadium on a game day. Fifteen people are dead, the stands are gone, and the town is holding vigils by candlelight.",
+    tag: "The Stadium is destroyed · 15 dead · policing demand up for 40 days", crime: 6, stadiumLost: true, kills: 15, disaster: true,
+    needs: (st) => (st.grid || []).some((c) => c && c.type === "stadium" && !c.build),
+    weight: 0.4 },
   { id: "heist", name: "Bank Robbery", icon: "\uD83D\uDCB8", days: 1,
     body: "City funds were among those pillaged by masked gunmen.",
     tag: "City funds taken", cash: -500, cashScale: true,
@@ -1197,17 +1215,24 @@ const SHOOTING_WAR = 3.6;        // and far more often once the family is at odd
 const SHOOTING_POP = 45;         // a town smaller than this cannot absorb a night like that
 const SHOOTING_POP_WAR = 34;     // except in a feud, when the shooting comes anyway
 const SHOOTING_SHOCK = 20;       // days of frozen immigration and a subdued town
+const VANDAL_DAYS = 30;      // a smashed shopfront stays boarded this long
 const PROTEST_MOOD = 20;     // below this the town starts gathering
 const PROTEST_DAYS = 3;      // consecutive days of it before they march
 const INDICT_WARN_HEAT = 80;   // last call before the file closes
 const FED_TRIGGER = 3;
 const BUYOUT_ODDS = 0.7;  // paying to make a crisis go away works seven times in ten
+const VOTES_MIN_DAY = 220;     // the midnight call only comes deep into a run
+const VOTES_ODDS = 0.01;       // daily chance once it can
 const SLANDER_CRIME = 50;      // the President only says it once the numbers back him
 const SLANDER_ODDS = 0.012;    // daily chance he says it out loud
 const SLANDER_DAYS = 30;       // how long either answer hangs around
 const SLANDER_COOL = 200;      // and how long before the subject comes up again
 const SLANDER_MORALE = 0.75;   // what agreeing does to every beat in the city
 const RALLY_WAIT = 25;         // days a finished stadium stands before the advance team calls
+const SURV_ODDS = 0.009;       // daily chance the Governor's security friend calls
+const SURV_MIN_DAY = 70;       // mid-game onward
+const SURV_COOL = 150;         // and he calls back if you turned him down before
+const SURV_OUTCRY_DAYS = 30;   // how long the town grumbles about being filmed
 const GOLF_ODDS = 0.011;       // daily chance the Governor brings up his handicap
 const GOLF_DAYS = 60;          // days to deliver the course once promised
 const GOLF_NEAR = 2;           // it must sit within this many tiles of the mansion
@@ -1406,7 +1431,7 @@ function freshState(seed, diff) {
     govAsk: 0, govAskDay: 0, govBuiltDay: 0, govTraffic: 1, churchGov: 1, churchGovUntil: 0, works: "balanced", lawyerId: null, lawyerOffer: 0, lawyerFrom: 0,
     fedFavor: 0, lawyerLocked: 0, potus: 0, judyUntil: 0, judySeen: 0, commsId: null,
     feud: 0, marla: 0, marlaCool: 0, commsLocked: 0, rally: 0, stadiumDay: 0, slander: 0, slanderUntil: 0, slanderCool: 0, schoolAudit: 0, sSchool: 0, schoolNotice: 0, staffOffer: 0, govYes: 0, freeLandmark: 0, freeApartment: 0, buyoutFailed: 0, everRefused: 0, everAllied: 0,
-    sIdle: 0, sRed: 0, sDisc: 0, sPower: 0, mayor: null, tsuiHush: 0, tsuiBound: 0, golfAsk: 0, golfUntil: 0, statueOffer: 0, eco: 0, ecoUntil: 0, ecoCool: 0, ecoParks: 0, speakerDown: 0, speakerUntil: 0, speakerCool: 0, tsuiLoan: 0, tsuiLoanUntil: 0, tsuiLoanCool: 0, tsuiLoanTook: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
+    sIdle: 0, sRed: 0, sDisc: 0, sPower: 0, mayor: null, stolenVotes: 0, vandalMark: 0, surv: 0, survCool: 0, survOutcryUntil: 0, freeCameras: 0, rallyMood: 0, rallyUntil: 0, tsuiHush: 0, tsuiBound: 0, golfAsk: 0, golfUntil: 0, statueOffer: 0, eco: 0, ecoUntil: 0, ecoCool: 0, ecoParks: 0, speakerDown: 0, speakerUntil: 0, speakerCool: 0, tsuiLoan: 0, tsuiLoanUntil: 0, tsuiLoanCool: 0, tsuiLoanTook: 0, tierSeen: 0, tierUp: 0, tierQuote: 0, quotesUsed: [], invest: 0, investCool: 0, investTook: 0, pendingFactory: 0, speech: 0, promise: null, promiseDay: 0, promiseSeq: 0, promiseBroken: 0, promiseKept: 0, log: [], logSeq: 0, dismissed: [] };
 }
 
 const rc = (i) => [Math.floor(i / SIZE), i % SIZE];
@@ -1429,7 +1454,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     && (c.type === "bus" || c.type === "subway")).length;
   const CH = CHIEFS[flags.chiefId] || null;
   const chiefStaff = CH ? CH.staff : 0;
-  const copMul = (CH ? CH.police : 1) * (flags.shake ? 0.5 : 1) * (flags.protestMul || 1);
+  const copMul = (CH ? CH.police : 1) * (flags.shake ? 0.5 : 1) * (flags.protestMul || 1) * (flags.leaderless ? 0.85 : 1);
   const entRevMul = CH ? CH.entRev : 1;
   let waivedStations = 0, churchTax = 0;
   const H = HEIRS[heirKey] || null;
@@ -1716,13 +1741,20 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     const smogPenalty = 1 - 0.2 * pollMul * smogAt(r, c);
     const crew = status[i].crew === undefined ? 1 : status[i].crew;
     if (cell.type === "house") { popCap += b.cap; houses.push([r, c]); targets.push([r, c]); }
-    if (cell.type === "shop") { jobs += b.jobs; shops.push([i, b.rev || 0, smogPenalty * crew * shopRevMul]); targets.push([r, c]); }
+    if (cell.type === "shop") {
+      if (cell.vandal && (flags.day || 0) < cell.vandal) {
+        // Boarded up. No staff, no till, nothing to tax; the glazier comes eventually.
+        status[i].vandalized = true;
+        return;
+      }
+      jobs += b.jobs; shops.push([i, b.rev || 0, smogPenalty * crew * shopRevMul]); targets.push([r, c]); }
     if (cell.type === "factory") { jobs += b.jobs; upkeep += indUp(b.upkeep); upIndustry += indUp(b.upkeep);
       goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1) * highwayTrade * (flags.commsTrade || 1) * (MY.ind || 1)); if (cell.smuggle) smuggling += 1;
       factories.push([r, c, indUp(b.upkeep)]); targets.push([r, c]); }
     if (cell.type === "police") { const cu = Math.round(civicCost(b.upkeep) * F.upkeep * (flags.copWage || 1));
       jobs += Math.max(1, b.jobs + F.staff + chiefStaff);
-      if (CH && CH.tsuiStations && waivedStations < CH.tsuiStations) waivedStations++;
+      const tsuiCap = CH && CH.tsuiStations ? CH.tsuiStations + (flags.mayor === "jenkins" && CH.name === "Leroy Jenkins" ? 1 : 0) : 0;
+      if (waivedStations < tsuiCap) waivedStations++;
       else { upkeep += cu; upCivic += cu; }
       if (!flags.copsOut) cops.push([r, c, (b.reach || 3) + (T.police > 1 ? 1 : 0), crew]); }
     // Cameras watch a smaller radius at partial strength. They fill the gaps a
@@ -2141,6 +2173,9 @@ function step(prev) {
   });
   if (built) prev = { ...prev, grid };
   const T = TAX[prev.tax] || TAX.normal;
+  // Under Mulaney, grievances lose steam before they find the street. Read
+  // here, at the top, because unrest checks are scattered all through step.
+  const mCalm = (MAYORS[prev.mayor] || {}).calm || 1;
   // The family's arrangement, read before anything that depends on the police
   // budget: while it holds, the force runs on a shoestring no matter what the
   // menu last said.
@@ -2155,7 +2190,7 @@ function step(prev) {
   const d = derive(prev.grid, Math.floor(prev.pop), prev.tax, prev.fund, prev.terrain, prev.heir, prev.event, { interstate: prev.interstate, works: prev.works, govTraffic: prev.govTraffic, mafia: prev.mafia, everRefused: prev.everRefused, testified: prev.testified, lawyerFee: LAWYERS[prev.lawyerId] ? LAWYERS[prev.lawyerId].fee : 0,
       commsFee: COMMS[prev.commsId] ? COMMS[prev.commsId].fee : 0, commsTrade: COMMS[prev.commsId] ? COMMS[prev.commsId].trade : 1,
       commsMood: COMMS[prev.commsId] ? COMMS[prev.commsId].mood : 0,
-      chiefFee: CHIEFS[prev.chiefId] ? (CHIEFS[prev.chiefId].salary || 0) : 0, govTrade: prev.govTrade, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, mayor: prev.mayor, speakersDown: (prev.speakerDown || 0) === 1,
+      chiefFee: CHIEFS[prev.chiefId] ? (CHIEFS[prev.chiefId].salary || 0) : 0, govTrade: prev.govTrade, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, mayor: prev.mayor, day: prev.day, leaderless: !prev.chiefId && (prev.deadChiefs || []).length >= Object.keys(CHIEFS).length, speakersDown: (prev.speakerDown || 0) === 1,
       protestTraffic: ((prev.eco === 3 || prev.eco === 5) && prev.day < (prev.ecoUntil || 0)) ? 2 : 1, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
   const baseHap = calcHap(prev.pop, d, prev.mafia, prev.crime);
   const hap = baseHap + (H ? H.mood : 0) + (CHF ? CHF.mood : 0) + (EV && EV.mood ? EV.mood : 0);
@@ -2249,9 +2284,9 @@ function step(prev) {
       && day >= shootingUntil) {
     const feud = atWarWithTsui ? SHOOTING_WAR : 1;
     if (evRoll(113) < SHOOTING_ODDS * feud) {
-      // Two to ten, and never more people than the town actually has.
-      const toll = Math.min(Math.floor(pop), 2 + Math.floor(evRoll(127) * 9));
-      if (toll >= 2) {
+      // One to eight, and never more people than the town actually has.
+      const toll = Math.min(Math.floor(pop), 1 + Math.floor(evRoll(127) * 8));
+      if (toll >= 1) {
         shootingDead = toll;
         shootingUntil = day + SHOOTING_SHOCK;
         shootingsSeen = shootingsSeen + 1;
@@ -2273,9 +2308,13 @@ function step(prev) {
     // committed law-and-order town can hold the line indefinitely.
     // A governor who has taken your side makes the state's cooperation slower
     // and the paperwork heavier. It never closes the file.
-    if (fedComplete(prev) && (prev.fedFavor || 0) >= 3) { heat = 0; fed = 0; }
+    // The votes deal is unconditional: no favor threshold, no expiry, ever.
+    if (prev.stolenVotes === 2 || (fedComplete(prev) && (prev.fedFavor || 0) >= 3)) { heat = 0; fed = 0; }
     const settled = prev.lawyerId && day >= (prev.lawyerFrom || 0) + LAWYER_HANDOVER;
-    const shield = (prev.govShield ? 0.6 : 1) * (settled ? LAWYERS[prev.lawyerId].heat : 1);
+    const lwHeat = settled
+      ? (prev.lawyerId === "jenkins" && prev.mayor === "jenkins" ? 0.3 : LAWYERS[prev.lawyerId].heat)
+      : 1;
+    const shield = (prev.govShield ? 0.6 : 1) * lwHeat;
     const exposure = (0.32 * ties + crime / 90) * DP.crime.heat * (prev.viral === 1 ? 1.4 : 1) * shield * (MAYORS[prev.mayor] ? (MAYORS[prev.mayor].heat || 1) : 1);
     // Defences slow the file but never close it: the deals are the evidence.
     const cool = Math.min(exposure * 0.75,
@@ -2352,7 +2391,7 @@ function step(prev) {
   let strikesSeen = prev.strikesSeen || 0;
   const anySchool = prev.grid.some((c) => c && c.type === "school" && !c.build);
   if (strike >= 2 && day >= strikeCool) strike = 0;      // contract settled, tempers cooled
-  if (strike === 0 && anySchool && day > strikeCool && evRoll(71) < STRIKE_ODDS) {
+  if (strike === 0 && anySchool && day > strikeCool && evRoll(71) < STRIKE_ODDS * mCalm) {
     strike = 1;
     strikesSeen = strikesSeen + 1;
     note("🍎", "THE TEACHERS ARE OUT", "The union wants a contract. The classrooms are empty until you answer.", "bad");
@@ -2481,7 +2520,7 @@ function step(prev) {
   let moodLowDays = prev.moodLowDays || 0;
   let protestsSeen = prev.protestsSeen || 0;
   if (protestUntil > 0 && day >= protestUntil) { protest = 0; protestUntil = 0; }
-  moodLowDays = baseHap < PROTEST_MOOD ? moodLowDays + 1 : 0;
+  moodLowDays = baseHap < PROTEST_MOOD ? moodLowDays + mCalm : 0;
   // Nobody marches against Quietmilk. If he already runs the department, the
   // grievance has no target and the crowd never forms.
   if (prev.chiefId === "quietmilk") moodLowDays = 0;
@@ -2533,6 +2572,17 @@ function step(prev) {
   if (feud === 0 && (prev.govAsk || 0) >= 2 && !prev.dictator && day >= FEUD_MIN_DAY
       && evRoll(191) < FEUD_ODDS) feud = 1;
 
+  // Another of the Governor's golfing circle owns a private security firm, and
+  // Sanders is happy to make the introduction. Recurs if turned down, because
+  // salesmen do.
+  let surv = prev.surv || 0;
+  let survCool = prev.survCool || 0;
+  let survOutcryUntil = prev.survOutcryUntil || 0;
+  if (surv === 0 && day >= SURV_MIN_DAY && day > survCool && !prev.dictator
+      && (prev.govAsk || 0) >= 1 && (prev.govAsk || 0) !== 4
+      && evRoll(229) < SURV_ODDS) surv = 1;
+  if (survOutcryUntil && day >= survOutcryUntil) survOutcryUntil = 0;
+
   // The Governor golfs. Once the town can build a course and his house stands,
   // sooner or later he mentions it.
   let golfAsk = prev.golfAsk || 0;
@@ -2568,6 +2618,33 @@ function step(prev) {
   let rally = prev.rally || 0;
   if (stadiumDay === 0 && prev.grid.some((c) => c && c.type === "stadium" && !c.build)) stadiumDay = day;
   if (rally === 0 && stadiumDay > 0 && !prev.dictator && day >= stadiumDay + RALLY_WAIT) rally = 1;
+
+  // The night a protest takes the streets, somebody puts a brick through a
+  // shopfront. One per protest, and only if the town has a shop to smash.
+  {
+    // A window is identified by the day it ends, which is unique per protest.
+    // One brick per window, however the window was opened.
+    const winId = ((protest === 2 || protest === 3) && day < protestUntil) ? protestUntil
+      : ((prev.eco === 3 || prev.eco === 5) && day < (prev.ecoUntil || 0)) ? prev.ecoUntil : 0;
+    if (winId && (prev.vandalMark || 0) !== winId) {
+      const shopsUp = [];
+      prev.grid.forEach((c, i) => { if (c && c.type === "shop" && !c.build && !(c.vandal && day < c.vandal)) shopsUp.push(i); });
+      if (shopsUp.length) {
+        const hit = shopsUp[Math.floor(evRoll(241) * shopsUp.length)];
+        const g2 = prev.grid.slice();
+        g2[hit] = { ...g2[hit], vandal: day + VANDAL_DAYS };
+        prev = { ...prev, grid: g2 };
+        note("🪟", "SHOP VANDALIZED", `A shopfront was smashed and looted in the unrest. Boarded up for ${VANDAL_DAYS} days: no jobs, no revenue.`, "bad");
+      }
+      prev = { ...prev, vandalMark: winId };
+    }
+  }
+
+  // Deep into a run, the phone rings after midnight. He needs votes found,
+  // and he is asking the kind of mayor who might know where to look.
+  let stolenVotes = prev.stolenVotes || 0;
+  if (stolenVotes === 0 && day >= VOTES_MIN_DAY && !prev.dictator
+      && evRoll(239) < VOTES_ODDS) stolenVotes = 1;
 
   // Once the crime numbers are bad enough to quote, Washington quotes them.
   let slander = prev.slander || 0;
@@ -2618,7 +2695,7 @@ function step(prev) {
   const parksNow = prev.grid.filter((c) => c && c.type === "park" && !c.build).length;
   const chimneys = prev.grid.filter((c) => c && c.type === "factory" && !c.build).length;
   if (eco === 0 && chimneys >= ECO_FACTORIES && env < ECO_ENV && day > CRIME_GRACE
-      && day > ecoCool && evRoll(223) < ECO_ODDS) eco = 1;
+      && day > ecoCool && evRoll(223) < ECO_ODDS * mCalm) eco = 1;
   if (eco === 2) {
     // Every plant on solar, and three more parks than the day you promised.
     const plants = prev.grid.filter((c) => c && c.type === "plant" && !c.build);
@@ -2642,7 +2719,7 @@ function step(prev) {
   const poles = prev.grid.filter((c) => c && c.type === "speaker" && !c.build).length;
   if (speakerDown === 1 && day >= speakerUntil) speakerDown = 2;
   if (speakerDown === 0 && poles >= SPEAKER_MIN && day > CRIME_GRACE && day > speakerCool
-      && evRoll(211) < SPEAKER_ODDS) {
+      && evRoll(211) < SPEAKER_ODDS * mCalm) {
     speakerDown = 1;
     speakerUntil = day + SPEAKER_DAYS;
     speakerCool = day + SPEAKER_DAYS + SPEAKER_COOL;
@@ -2731,7 +2808,10 @@ function step(prev) {
   const justRefused = !!prev.justBroke;
   if (justRefused) {
     tsuiWar = day;
-    chiefHit = prev.chiefId ? day + 5 : 0;   // no chief to kill, no hit
+    // Vincent kills a chief over a betrayal, not a refusal. Turn him down at
+    // the door and the department is left alone.
+    const wasPartner = (prev.everAllied || 0) === 1 || (prev.graft || 0) > 0;
+    chiefHit = prev.chiefId && wasPartner ? day + 5 : 0;
   }
   // Severing agreements: the back room closes and factory smuggling stops.
   let backroom = justRefused ? false : prev.backroom;
@@ -2744,10 +2824,9 @@ function step(prev) {
   let deadChiefs = prev.deadChiefs || [];
   let vacancyReason = prev.vacancyReason || (prev.chiefId ? "" : "opening");
   if (chiefHit > 0 && day >= chiefHit && chiefId) {
-    const survivorsAfter = Object.keys(CHIEFS).filter((k) => k !== chiefId && !deadChiefs.includes(k));
-    if (survivorsAfter.length === 0) {
-      chiefHit = 0;   // the last possible chief survives; someone must run the department
-    } else {
+    // Nobody is spared. When the last one goes, the department runs itself,
+    // badly, until a successor brings a new slate.
+    {
       pendingMonument = CHIEFS[chiefId] ? CHIEFS[chiefId].name : null;
       chiefKilled = (prev.chiefKilled || 0) + 1;
       note("🔪", "THE CHIEF IS DEAD", `${CHIEFS[chiefId] ? CHIEFS[chiefId].name : "The chief"} was killed in a Tsui reprisal. Name a successor.`, "bad");
@@ -2786,7 +2865,7 @@ function step(prev) {
   const reprisalDue = mayBurn && tsuiWar > 0 && sinceWar === 15 && arsonDay !== day;
   // Otherwise the fires come every couple of weeks, hotter while the war is
   // fresh, and never as a certainty.
-  const warHeat = sinceWar >= 0 && sinceWar <= 60 ? 0.28 : 0.17;
+  const warHeat = sinceWar >= 0 && sinceWar <= 60 ? 0.24 : 0.14;
   const weeklyDue = atOddsWithTsui && mayBurn
     && day % 14 === 0 && arsonDay !== day
     && evRoll(53) < warHeat;
@@ -2798,6 +2877,7 @@ function step(prev) {
         if (!c || c.build) return;
         if (c.type === "hall" || c.type === "hallpart") return;   // never City Hall
         if (c.type === "road" || c.type === "bridge" || c.type === "line") return;  // infrastructure, not a "building"
+        if (c.type === "plant") return;   // they are gangsters, not terrorists; the lights stay on
         const priority = (c.type === "police" ? 100000 : 0) + investedIn(c);
         candidates.push([i, priority]);
       });
@@ -2820,6 +2900,42 @@ function step(prev) {
       arsonDay = day;   // one attempt per cadence day regardless of outcome
   }
   if (arsonGrid) prev = { ...prev, grid: arsonGrid };
+
+  // A terrorist attack takes its target on the day it lands. Not the Tsuis'
+  // work, and not their style; the town reads it as a policing failure anyway.
+  let disasterAid = 0;
+  const landedEv = event && event !== prev.event ? eventById(event) : null;
+  if (landedEv && (landedEv.plantLost || landedEv.stadiumLost)) {
+    const targetType = landedEv.plantLost ? "plant" : "stadium";
+    const spots = [];
+    prev.grid.forEach((c, i) => { if (c && c.type === targetType && !c.build) spots.push(i); });
+    if (spots.length) {
+      const hit = spots[Math.floor(evRoll(233) * spots.length)];
+      const g2 = prev.grid.slice(); g2[hit] = null;
+      prev = { ...prev, grid: g2 };
+      if (landedEv.kills) {
+        pop = Math.max(0, pop - landedEv.kills);
+        note("💥", "STADIUM BOMBED", `${landedEv.kills} dead at Luckhead Stadium. The stands are gone; the vigils go on all week.`, "bad");
+      } else {
+        note("💥", "POWER PLANT DESTROYED", "A local terrorist group levelled a Power Plant overnight. The tile is cleared and the grid is short.", "bad");
+      }
+    }
+  }
+  // After a disaster, friends in high places write cheques: $500 from the
+  // statehouse and $500 from Washington, each only if they think well of you.
+  // And the town itself pulls together for a month.
+  let rallyMood = prev.rallyMood || 0;
+  let rallyUntil = prev.rallyUntil || 0;
+  if (landedEv && landedEv.disaster) {
+    const govFriend = govStandingOf(prev) >= 1 && (prev.govAsk || 0) > 0 && (prev.govAsk || 0) !== 4;
+    const fedFriend = fedFavorOf(prev) >= 1;
+    disasterAid = (govFriend ? 500 : 0) + (fedFriend ? 500 : 0);
+    if (disasterAid > 0)
+      note("🤝", "ASSISTANCE PACKAGES", `${govFriend && fedFriend ? "The Governor and the President each send" : govFriend ? "Governor Sanders sends" : "The President sends"} $500 in disaster assistance.`, "good");
+    rallyMood = 6;
+    rallyUntil = day + 30;
+  }
+  if (rallyUntil && day >= rallyUntil) { rallyMood = 0; rallyUntil = 0; }
 
   // Ten days after the Theatre opens, a local rapper gets caught there
   // with more contraband than a tour bus should hold.
@@ -2948,10 +3064,10 @@ function step(prev) {
   const grant = fedGrantOf(prev, pop);
   const stategrant = govGrantOf(prev, pop);
   const entry = { day, taxes, trade: d.revenue, goods: d.goods, power: -d.upPower,
-    industry: -d.upIndustry, civic: -d.upCivic, mob: mafiaMoney, windfall, grant, stategrant, notes };
+    industry: -d.upIndustry, civic: -d.upCivic, mob: mafiaMoney, windfall: windfall + disasterAid, grant, stategrant, notes };
   const ledger = [...(prev.ledger || []), entry].slice(-7);
 
-  const net = taxes + d.revenue + d.goods - d.upkeep + mafiaMoney + windfall + grant + stategrant;
+  const net = taxes + d.revenue + d.goods - d.upkeep + mafiaMoney + windfall + disasterAid + grant + stategrant;
 
   // Streaks of unanswered trouble. A new mayor finds out a fortnight before the
   // vote does, instead of on election night.
@@ -2975,7 +3091,10 @@ function step(prev) {
   const money = prev.money + net;
   if (money <= DEBT_FLOOR) { over = true; broke = true; }
   const log = newEntries.length ? [...(prev.log || []), ...newEntries].slice(-LOG_KEEP) : (prev.log || []);
-  return { ...prev, musicSet, golfAsk, golfUntil, statueOffer, eco, ecoUntil, ecoCool, speakerDown, speakerUntil, speakerCool, tsuiLoan, tsuiLoanUntil, tsuiLoanCool, tsuiHush, staffOffer, potus, judyUntil, judySeen,
+  return { ...prev, musicSet, stolenVotes,
+    // He remembers who helped, and who did not, for the rest of the game.
+    fedFavor: stolenVotes === 2 ? 3 : stolenVotes === 3 ? FED_FAVOR_MIN : prev.fedFavor,
+    surv, survCool, survOutcryUntil, rallyMood, rallyUntil, golfAsk, golfUntil, statueOffer, eco, ecoUntil, ecoCool, speakerDown, speakerUntil, speakerCool, tsuiLoan, tsuiLoanUntil, tsuiLoanCool, tsuiHush, staffOffer, potus, judyUntil, judySeen,
     feud, marla, marlaCool, rally, stadiumDay, slander, slanderUntil, slanderCool,
     sSchool, schoolAudit, schoolNotice, sIdle, sRed, sDisc, sPower, govStage, govPending, govAsk, govAskDay, govBuiltDay,
     govRel: govAsk === 4 || govRelStep !== (prev.govRel || 0) ? govRelStep : (prev.govRel || 0), fund: fundKeyNow, tierSeen, tierUp, tierQuote, quotesUsed, log, logSeq, env, speech, promise, promiseDay, promiseSeq, promiseBroken, promiseKept, pop, money, broke, day, mafia, crime, calm, approval, over, elected, ledger, polled, lossWarned, unlocked, chief, smuggleOffer, venueDay, venueOffer, fed, heat, ties, reprisal, dayUnlocked, succession, tsuiReturn, event, eventEnds, eventSeen, nextEvent, challenger, lastElection, electionSeen, theatreDay, bust, pvisit, faithMeet, campaign, loanOffer, tsuiWar, chiefHit, chiefKilled, deadChiefs, vacancyReason, pendingMonument, chiefId, backroom, justBroke: false, ice, iceUntil, graffiti, graffitiUntil, graffitiSeen, billboardDay, riot, riotUntil, riotSeen, prisonDay, viral, viralSeen, viralAck, hideawayFirstDay, blackmail, blackmailSeen, blackmailUntil: prev.blackmailUntil || 0, arsonDay, arsonCount, lastArson, arsonAck, indictWarn, protest, protestUntil, moodLowDays, protestsSeen, strike, strikeUntil, strikeCool, strikesSeen, schoolDemand, cop, copUntil, copCool, doctrine, doctrineCool, lowWarn, envWarn, homelessWarn, shooting, shootingUntil, shootingDead, shootingsSeen, invest, investCool, river, riverUntil, riverCool, riversSeen, pothole, potholeCool, potholeTile, potholesSeen, press,
@@ -3403,7 +3522,7 @@ export default function Luckhead() {
   const d = useMemo(() => derive(st.grid, Math.floor(st.pop), st.tax, st.fund, st.terrain, st.heir, st.event, { interstate: st.interstate, works: st.works, govTraffic: st.govTraffic, mafia: st.mafia, everRefused: st.everRefused, testified: st.testified, lawyerFee: LAWYERS[st.lawyerId] ? LAWYERS[st.lawyerId].fee : 0,
       commsFee: COMMS[st.commsId] ? COMMS[st.commsId].fee : 0, commsTrade: COMMS[st.commsId] ? COMMS[st.commsId].trade : 1,
       commsMood: COMMS[st.commsId] ? COMMS[st.commsId].mood : 0,
-      chiefFee: CHIEFS[st.chiefId] ? (CHIEFS[st.chiefId].salary || 0) : 0, govTrade: st.govTrade, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, mayor: st.mayor, speakersDown: (st.speakerDown || 0) === 1,
+      chiefFee: CHIEFS[st.chiefId] ? (CHIEFS[st.chiefId].salary || 0) : 0, govTrade: st.govTrade, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, mayor: st.mayor, day: st.day, leaderless: !st.chiefId && (st.deadChiefs || []).length >= Object.keys(CHIEFS).length, speakersDown: (st.speakerDown || 0) === 1,
       protestTraffic: ((st.eco === 3 || st.eco === 5) && st.day < (st.ecoUntil || 0)) ? 2 : 1, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
   const hap = calcHap(st.pop, d, st.mafia, st.crime);
   const fp = Math.floor(st.pop);
@@ -3582,6 +3701,8 @@ export default function Luckhead() {
   const showFeud = st.feud === 1 && !st.over;
   const showMarla = st.marla === 1 && !st.over;
   const showGolf = st.golfAsk === 1 && !st.over;
+  const showSurv = st.surv === 1 && !st.over;
+  const showVotes = st.stolenVotes === 1 && !st.over;
   const showRally = st.rally === 1 && !st.over;
   const showSlander = st.slander === 1 && !st.over;
   const showEco = st.eco === 1 && !st.over;
@@ -3601,20 +3722,26 @@ export default function Luckhead() {
   const showEvent = (st.eventSeen || 0) > prevEvent.current && !!EV && !st.over;
 
   // The day-7 appointment is mandatory and outranks every other interruption.
-  const mustPickChief = st.day >= 7 && !st.chiefId && !st.over;
+  const mustPickChief = st.day >= 7 && !st.chiefId && !st.over
+    && (st.deadChiefs || []).length < Object.keys(CHIEFS).length;   // nobody left to appoint
 
   // One interruption at a time, and never two within MODAL_GAP days. Anything
   // held back keeps its flag and simply waits its turn.
   const pendingModals = [
     ["heir", showHeir], ["vote", showVote], ["fed", showFed], ["indict", showIndict], ["protest", showProtest], ["arson", showArson], ["viral", showViral], ["speech", showSpeech], ["invest", showInvest], ["river", showRiver], ["strike", showStrike], ["cop", showCop], ["doctrine", showDoctrine], ["chief", showChief],
     ["ice", showIce], ["blackmail", showBlackmail],
-    ["potus", showPotus], ["eco", showEco], ["golf", showGolf], ["rally", showRally], ["slander", showSlander], ["marla", showMarla], ["feud", showFeud], ["audit", showAudit], ["hush", showHush], ["staff", showStaff], ["govask", showGovAsk], ["gov", showGov], ["tsuiloan", showTsuiLoan], ["loan", showLoan], ["pvisit", showPvisit], ["bust", showBust],
+    ["potus", showPotus], ["votes", showVotes], ["eco", showEco], ["surv", showSurv], ["golf", showGolf], ["rally", showRally], ["slander", showSlander], ["marla", showMarla], ["feud", showFeud], ["audit", showAudit], ["hush", showHush], ["staff", showStaff], ["govask", showGovAsk], ["gov", showGov], ["tsuiloan", showTsuiLoan], ["loan", showLoan], ["pvisit", showPvisit], ["bust", showBust],
     ["smuggle", showSmuggle], ["venue", showVenue], ["faith", showFaith],
     ["campaign", showCampaign], ["event", showEvent],
   ].filter(([, on]) => on).map(([k]) => k);
   const queueLen = pendingModals.length;
   const cooling = (st.modalGap || 0) > st.day;
-  const active = mustPickChief ? null : (queueLen && !cooling ? pendingModals[0] : null);
+  // A fire, a killing, an indictment: these show the day they happen, cooldown
+  // or not. Routine business still waits its turn.
+  const urgentUp = pendingModals.find((k) => URGENT_MODALS.has(k));
+  const active = mustPickChief ? null
+    : urgentUp ? urgentUp
+    : (queueLen && !cooling ? pendingModals[0] : null);
   const show = (k) => active === k;
 
   // Banners: the newest few log entries the player has not waved away yet.
@@ -3729,7 +3856,7 @@ export default function Luckhead() {
         mayor: pickMayor,
         ...(pickMayor === "jenkins" ? { mafia: "allied", everAllied: 1 } : {}),
         ...(pickMayor === "mulaney" ? { govRel: 1 } : {}),
-        ...(pickMayor === "debbs" ? { tax: "high" } : {}) };
+        ...(pickMayor === "debbs" ? { tax: "high", fedFavor: -1 } : {}) };
     lastSave.current = Date.now();
     saveGame(next);
     setSt(next);
@@ -3785,6 +3912,8 @@ export default function Luckhead() {
   };
 
   const describe = (cell, s, i) => {
+    if (cell.type === "shop" && cell.vandal && s.day < cell.vandal)
+      return `Boarded up after the unrest. No jobs, no revenue for ${cell.vandal - s.day} more day${cell.vandal - s.day === 1 ? "" : "s"}. The glazier is booked solid.`;
     const b = statsOf(cell);
     const up = nextUp(cell);
     const tail = up ? ` Upgrade to ${up.name}: $${upCostOf(cell, d.bankCount, st.loans, ecoCost)}.`
@@ -3964,8 +4093,14 @@ export default function Luckhead() {
     }
     const usesLandmarkCredit = st.freeLandmark && LANDMARKS_BUILD.includes(tool);
     const usesApartment = !!st.freeApartment && tool === "house";
+    const usesFreeCamera = (st.freeCameras || 0) > 0 && tool === "camera";
+    // Leroy's arrangement: the family pays for the first N stations outright.
+    const tsuiCapUI = st.chiefId === "jenkins"
+      ? (CHIEFS.jenkins.tsuiStations || 0) + (st.mayor === "jenkins" ? 1 : 0) : 0;
+    const usesTsuiStation = tool === "police"
+      && st.grid.filter((c) => c && c.type === "police").length < tsuiCapUI;
     const clearing = ground === WOODS ? CLEAR_COST : 0;
-    const price = (usesLandmarkCredit || usesApartment) ? 0
+    const price = (usesLandmarkCredit || usesApartment || usesFreeCamera || usesTsuiStation) ? 0
       : costOf(tool, st.tax, d.bankCount, st.loans, ecoCost) + clearing;
     if (st.money < price) {
       setNote(clearing
@@ -3986,10 +4121,13 @@ export default function Luckhead() {
       const env = clearing ? Math.max(0, (s.env === undefined ? START_ENV : s.env) - 5) : s.env;
       return { ...s, grid, env, money: s.money - price, seq: s.seq + 1,
                freeLandmark: usesLandmarkCredit ? 0 : s.freeLandmark,
-               freeApartment: usesApartment ? 0 : s.freeApartment };
+               freeApartment: usesApartment ? 0 : s.freeApartment,
+               freeCameras: usesFreeCamera ? Math.max(0, (s.freeCameras || 0) - 1) : (s.freeCameras || 0) };
     });
     if (usesLandmarkCredit) setToast("\uD83C\uDFDB\uFE0F The statehouse pays for it, as promised.");
     if (usesApartment) setToast("\uD83C\uDFDB\uFE0F The developer's crew was already on site. Apartments, finished, no charge.");
+    if (usesFreeCamera) setToast(`\uD83D\uDCF7 Installed on the firm's dime.${(st.freeCameras || 0) > 1 ? " One more to place." : ""}`);
+    if (usesTsuiStation) setToast("\uD83D\uDC6E The family picked up the tab for this one. Ask nothing.");
     setNote(null);
   };
 
@@ -4193,7 +4331,8 @@ export default function Luckhead() {
           </span>
         )}
         {cell && cell.type !== "road" && cell.type !== "line" && cell.type !== "hall" && cell.type !== "hallpart" && (
-          <span key={cell.seq} className="pop" style={{ fontSize: "clamp(12px, 4.6vw, 20px)", lineHeight: 1, opacity: cell.build > 0 ? 0.35 : 1 }}>
+          <span key={cell.seq} className="pop" style={{ fontSize: "clamp(12px, 4.6vw, 20px)", lineHeight: 1, opacity: cell.build > 0 ? 0.35 : (cell.vandal && st.day < cell.vandal) ? 0.55 : 1,
+                         filter: (cell.vandal && st.day < cell.vandal) ? "grayscale(1)" : "none" }}>
             {BUILD[cell.type].icon}
           </span>
         )}
@@ -4842,11 +4981,16 @@ export default function Luckhead() {
             key={k}
             icon={BUILD[k].icon}
             label={BUILD[k].name === "Power Plant" ? "Plant" : BUILD[k].name === "Power Line" ? "Line" : BUILD[k].name === "Campaign Billboard" ? "Billboard" : BUILD[k].name}
-            sub={(k === "house" && st.freeApartment) ? "FREE · Apartments"
+            sub={(k === "police" && st.chiefId === "jenkins"
+                  && st.grid.filter((c) => c && c.type === "police").length < (CHIEFS.jenkins.tsuiStations || 0) + (st.mayor === "jenkins" ? 1 : 0))
+                ? "FREE · the family pays"
+              : (k === "camera" && (st.freeCameras || 0) > 0) ? `FREE · ${st.freeCameras} left`
+              : (k === "house" && st.freeApartment) ? "FREE · Apartments"
               : (st.freeLandmark && LANDMARKS_BUILD.includes(k)) ? "FREE · statehouse"
               : `$${costOf(k, st.tax, d.bankCount, st.loans, ecoCost)}${BUILD[k].jobs ? `·${BUILD[k].jobs}👤` : ""}${buildDays(k) ? `·${buildDays(k)}d` : ""}`}
             active={tool === k}
-            dimmed={!(k === "house" && st.freeApartment)
+            dimmed={!(k === "camera" && (st.freeCameras || 0) > 0)
+              && !(k === "house" && st.freeApartment)
               && !(st.freeLandmark && LANDMARKS_BUILD.includes(k))
               && st.money < costOf(k, st.tax, d.bankCount, st.loans, ecoCost)}
             onPick={() => {
@@ -4934,7 +5078,9 @@ export default function Luckhead() {
         const pollAtk = challengerAttack(st.challenger, pollCtx);
         const ahead = Math.round(st.approval) >= 51;
         const riggedAlready = st.rigged;
-        const canRig = st.mafia === "allied" || st.mafia === "refused" || st.mafia === "defeated";
+        // Rigging is a favour the family does for a friend. A mayor at war with
+        // them has nobody left in town who will touch the count.
+        const canRig = st.mafia === "allied" || st.mafia === "defeated";
         const dismiss = () => { prevPolled.current = st.polled; setSpeed("play"); };
         return (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 62 }}>
@@ -6201,6 +6347,34 @@ export default function Luckhead() {
       )}
 
       {/* the two of them fall out in public */}
+      {/* the midnight call */}
+      {show("votes") && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 65, padding: 16 }}>
+          <div style={{ width: "min(88vw, 362px)", background: C.panel, border: `1px solid ${C.red}`, borderRadius: 16, padding: 18 }}>
+            <div style={{ ...mono, fontSize: 10, color: C.red, letterSpacing: "0.2em", marginBottom: 3 }}>THE WHITE HOUSE, AFTER MIDNIGHT</div>
+            <div style={{ ...disp, fontSize: 17, marginBottom: 10 }}>THE MISSING VOTES</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
+              The President is on the line himself. His reelection bid has come up short, and he would like your help to "find" the missing votes he needs. He does not say how. He says he will remember who helped, and he says it twice.
+            </div>
+            <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+              <span style={{ color: C.amber }}>FIND THE VOTES</span> · federal immunity, forever · his friendship at its ceiling for the rest of the game · the town whispers: -3 approval, permanently<br />
+              <span style={{ color: C.green }}>REFUSE HIM</span> · +2 approval, permanently · +1 with Governor Sanders · he cuts every federal dollar and opens an investigation into you personally
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <span style={{ flex: 1 }} />
+              <span onClick={() => { setSt((s) => ({ ...s, stolenVotes: 3, govRel: (s.govRel || 0) + 1,
+                                       fedFavor: FED_FAVOR_MIN, fed: Math.max(1, s.fed || 0),
+                                       heat: Math.min(100, (s.heat || 0) + 20), modalGap: s.day + MODAL_GAP }));
+                                     setToast("\u260E\uFE0F You hang up. By morning, Washington has forgotten Luckhead exists, except for the subpoenas."); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: C.green, color: C.ink, borderRadius: 9, padding: "7px 12px" }}>REFUSE HIM</span>
+              <span onClick={() => { setSt((s) => ({ ...s, stolenVotes: 2, fedFavor: 3, modalGap: s.day + MODAL_GAP }));
+                                     setToast("\u260E\uFE0F The votes are found. Nobody will ever look at Luckhead's books again."); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: "transparent", color: C.red, border: `1px solid ${C.red}`, borderRadius: 9, padding: "7px 12px" }}>FIND THE VOTES</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* the town wants regulations */}
       {show("eco") && (() => {
         const parksNow = st.grid.filter((c) => c && c.type === "park" && !c.build).length;
@@ -6233,6 +6407,36 @@ export default function Luckhead() {
           </div>
         );
       })()}
+
+      {/* the Governor's security friend */}
+      {show("surv") && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 64, padding: 16 }}>
+          <div style={{ width: "min(88vw, 362px)", background: C.panel, border: `1px solid ${C.amber}`, borderRadius: 16, padding: 18 }}>
+            <div style={{ ...mono, fontSize: 10, color: C.amber, letterSpacing: "0.2em", marginBottom: 3 }}>A CALL FROM THE STATEHOUSE</div>
+            <div style={{ ...disp, fontSize: 17, marginBottom: 10 }}>A PRIVATE SURVEILLANCE PROPOSAL</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
+              A golfing buddy of Governor Sanders owns a private security company, and he is offering to front the cost of two surveillance Cameras for Luckhead. The Governor would consider it a personal courtesy.
+            </div>
+            <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+              <span style={{ color: C.green }}>ACCEPT THE CAMERAS</span> · two free Cameras to place · +1 standing with Sanders · public outcry: -2 approval for {SURV_OUTCRY_DAYS} days<br />
+              <span style={{ color: C.red }}>DECLINE</span> · -1 standing with Sanders
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <span style={{ flex: 1 }} />
+              <span onClick={() => { setSt((s) => ({ ...s, surv: 3, govRel: (s.govRel || 0) - 1,
+                                       survCool: s.day + SURV_COOL, modalGap: s.day + MODAL_GAP_SOFT }));
+                                     setToast("\uD83D\uDCF7 You pass. The Governor's friend will call again; his kind always do."); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: "transparent", color: C.cream, border: `1px solid ${C.line}`, borderRadius: 9, padding: "7px 12px" }}>DECLINE</span>
+              <span onClick={() => { setSt((s) => ({ ...s, surv: 2, govRel: (s.govRel || 0) + 1,
+                                       freeCameras: (s.freeCameras || 0) + 2,
+                                       survOutcryUntil: s.day + SURV_OUTCRY_DAYS,
+                                       survCool: s.day + 9999, modalGap: s.day + MODAL_GAP_SOFT }));
+                                     setToast("\uD83D\uDCF7 Two Cameras, on the firm's dime. The town has opinions about it."); }}
+                style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: C.amber, color: C.ink, borderRadius: 9, padding: "7px 12px" }}>ACCEPT THE CAMERAS</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* the Governor wants a tee time */}
       {show("golf") && (
@@ -6900,7 +7104,9 @@ export default function Luckhead() {
             <div onClick={(e) => e.stopPropagation()} style={{ width: "min(90vw, 384px)", maxHeight: "86vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
               <div style={{ ...disp, fontSize: 18 }}>POLICE CHIEF</div>
               <div style={{ ...mono, fontSize: 10.5, color: (mustPickChief && st.vacancyReason === "assassinated") ? C.red : shakeLeft ? C.amber : C.dim, marginBottom: 12 }}>
-                {mustPickChief && st.vacancyReason === "assassinated"
+                {!st.chiefId && (st.deadChiefs || []).length >= Object.keys(CHIEFS).length
+                  ? "Every chief Luckhead had is dead. The department runs itself at 85% until a successor brings a new slate."
+                  : mustPickChief && st.vacancyReason === "assassinated"
                   ? `The Tsuis had your chief killed. ${st.deadChiefs && st.deadChiefs.length ? CHIEFS[st.deadChiefs[st.deadChiefs.length - 1]].name : "The chief"} will not be replaced by anyone who saw what happened. Name one of the remaining candidates.`
                   : mustPickChief
                   ? "Day 7. The acting chief has retired to a lake, and the council will not adjourn until you name a replacement."
