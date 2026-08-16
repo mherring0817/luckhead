@@ -2069,7 +2069,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     - (highwayOn ? HIGHWAY_ENV : 0)
     + WK.env
   ));
-  return { status, powerCap, powerDemand, popCap, housing: popCap, jobs, upkeep, upPower, upIndustry, upCivic,
+  return { status, roadCap: ROAD_CAPACITY, powerCap, powerDemand, popCap, housing: popCap, jobs, upkeep, upPower, upIndustry, upCivic,
            revenue: revenueNet, revenueGross: revenue, traffic, congested, orphanRoads, envAvg, tavernMood,
            goods, learning, held, care, message, theatreOn, hideawayOn, plazaOn, fastparkOn, fastparkTax, churchTax, schoolTax, waterTax, bankCount, monumentCount, transit, buses: buses.length, venues: venues.length, rowdiness, smuggling, hallJobs, globalRelief, shops: shops.length, shopSaturation, supported,
            anyDisc, anyUnwired, anyOverload, anyUnstaffed, anyBuilding, plantBuilt, policeFrac,
@@ -3464,6 +3464,350 @@ function makeAudio() {
     isArmed: () => armed,
     wake,
   };
+}
+
+// ---- the walker layer ----
+// Little people on the streets, spawned and slowed by the same per-tile flow
+// the traffic number is built from. The canvas runs its own animation loop and
+// never touches React state: the sim re-renders once a day, the street moves
+// at sixty frames a second, and neither knows about the other.
+function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOut, protestOn, pop, jobs }) {
+  const canvasRef = useRef(null);
+  const worldRef = useRef({ walk: [], flow: [], cap: [], tiles: [], smoke: [], boards: [], crowdSpots: [] });
+  const walkersRef = useRef([]);
+  const copsRef = useRef([]);
+  const crowdRef = useRef([]);
+  const smokeRef = useRef([]);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const protestRef = useRef(protestOn);
+  protestRef.current = protestOn;
+
+  // Rebuild the world each day or build, then reconcile walkers instead of
+  // respawning them, so nobody teleports when the clock ticks.
+  useEffect(() => {
+    const N = SIZE * SIZE;
+    const walk = new Array(N).fill(false);
+    const flow = new Array(N).fill(0);
+    const cap = new Array(N).fill(roadCap || 6);
+    const tiles = [];
+    for (let i = 0; i < N; i++) {
+      const c = grid[i];
+      if (!c || c.build || (c.type !== "road" && c.type !== "bridge")) continue;
+      walk[i] = true;
+      flow[i] = (status && status[i] && status[i].flow) || 0;
+      if (c.type === "bridge") cap[i] = (roadCap || 6) * 0.6;
+      tiles.push(i);
+    }
+    const nb = (i) => {
+      const c = i % SIZE;
+      return [i - SIZE, i + SIZE, c > 0 ? i - 1 : -1, c < SIZE - 1 ? i + 1 : -1]
+        .filter((j) => j >= 0 && j < N && walk[j]);
+    };
+    // Chimneys: every working factory, and every working plant that has not
+    // been retrofitted to solar. The same rule the environment ledger uses.
+    const smoke = [];
+    // Boarded shops: the vandalism system's tiles, drawn as planks.
+    const boards = [];
+    // The crowd gathers on the tiles around City Hall.
+    const hallTiles = [];
+    for (let i = 0; i < N; i++) {
+      const c = grid[i];
+      if (!c || c.build) continue;
+      const working = status && status[i] && status[i].functioning;
+      if (working && c.type === "factory")
+        smoke.push({ i, w: 1.6 + 0.4 * (c.lv || 0), col: "rgba(168, 160, 140, " });
+      else if (working && c.type === "plant" && !plantStats(c).clean)
+        smoke.push({ i, w: 1.2 + 0.25 * (c.lv || 0), col: "rgba(200, 193, 172, " });
+      if (c.type === "shop" && c.vandal && day < c.vandal) boards.push(i);
+      if (c.type === "hall" || c.type === "hallpart") hallTiles.push(i);
+    }
+    const isHall = new Set(hallTiles);
+    const crowdSpots = [];
+    hallTiles.forEach((i) => {
+      const r = Math.floor(i / SIZE), c = i % SIZE;
+      [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([rr, cc]) => {
+        if (rr < 0 || cc < 0 || rr >= SIZE || cc >= SIZE) return;
+        const j = rr * SIZE + cc;
+        if (!isHall.has(j) && !crowdSpots.includes(j)) crowdSpots.push(j);
+      });
+    });
+    worldRef.current = { walk, flow, cap, tiles, smoke, boards, crowdSpots };
+
+    // How many people are out: the census itself, one dot per citizen,
+    // capped at 240 for the canvas. WHERE they walk is still weighted by real
+    // street flow, so busy corners stay busy. WHO they are comes from the
+    // labor ledger: white dots are employed citizens, orange dots are the
+    // unemployed in true proportion, and every officer on the beat is one
+    // employed citizen in blue instead of white.
+    const total = tiles.reduce((a, i) => a + flow[i], 0);
+    const popF = Math.max(0, Math.floor(pop || 0));
+    const target = Math.min(240, popF);
+    const unemployed = Math.max(0, popF - Math.min(popF, jobs || 0));
+    const orangeN = popF > 0 ? Math.min(target, Math.round(target * unemployed / popF)) : 0;
+    const whiteRaw = target - orangeN;
+
+    // The beat: one blue dot per officer the department actually fields, the
+    // same head-count the chief's wage bill is computed from, leashed to a
+    // patrol radius around their own station. A walkout empties the streets.
+    const copTarget = (() => {
+      if (copsOut) return 0;
+      let officers = 0;
+      const homes = [];
+      for (let i = 0; i < N; i++) {
+        const c = grid[i];
+        if (!c || c.type !== "police" || c.build) continue;
+        if (!(status && status[i] && status[i].functioning)) continue;
+        const crew = Math.max(1, (statsOf(c).jobs || 0) + ((FUND[fund] || FUND.normal).staff || 0)
+          + ((CHIEFS[chiefId] || {}).staff || 0));
+        for (let k = 0; k < crew; k++) homes.push(i);
+      }
+      officers = homes.length;
+      return { officers, homes };
+    })();
+    const REACH = 3; // patrol radius, matching a station's base reach
+    const nearRoads = (home) => {
+      const hr = Math.floor(home / SIZE), hc = home % SIZE;
+      return tiles.filter((t) => Math.abs(Math.floor(t / SIZE) - hr) + Math.abs((t % SIZE) - hc) <= REACH);
+    };
+    const cops = copsRef.current;
+    const copMax = copTarget === 0 ? 0 : Math.min(24, copTarget.officers, whiteRaw);
+    const whiteN = whiteRaw - copMax;
+    for (const cop of cops) {
+      if (!walk[cop.from] || !walk[cop.to]) cop.dead = true;
+      if (!grid[cop.home] || grid[cop.home].type !== "police" || grid[cop.home].build) cop.dead = true;
+    }
+    copsRef.current = cops.filter((c) => !c.dead).slice(0, copMax);
+    if (copMax > 0) {
+      let hi = 0;
+      while (copsRef.current.length < copMax && copTarget.homes.length) {
+        const home = copTarget.homes[hi % copTarget.homes.length]; hi++;
+        const beatTiles = nearRoads(home);
+        if (!beatTiles.length) { if (hi > copTarget.homes.length * 2) break; continue; }
+        const t = beatTiles[Math.floor(Math.random() * beatTiles.length)];
+        const opts = nb(t).filter((j) => beatTiles.includes(j));
+        copsRef.current.push({ home, from: t, to: opts.length ? opts[Math.floor(Math.random() * opts.length)] : t,
+          t: Math.random(), off: (Math.random() - 0.5) * 0.36 });
+      }
+    }
+
+    // The crowd itself: persistent so it mills rather than flickers.
+    const crowdMax = crowdSpots.length ? Math.min(14, 6 + crowdSpots.length) : 0;
+    while (crowdRef.current.length > crowdMax) crowdRef.current.pop();
+    while (crowdRef.current.length < crowdMax) {
+      const k = crowdRef.current.length;
+      crowdRef.current.push({ spot: crowdSpots[k % crowdSpots.length],
+        ox: (Math.random() - 0.5) * 0.55, oy: (Math.random() - 0.5) * 0.55,
+        ph: Math.random() * Math.PI * 2,
+        tint: k % 3 === 0 ? C.red : k % 3 === 1 ? C.amber : C.cream });
+    }
+
+    const ws = walkersRef.current;
+    const weightedTile = () => {
+      if (!tiles.length) return -1;
+      let pick = Math.random() * Math.max(1, total);
+      for (const i of tiles) { pick -= flow[i]; if (pick <= 0) return i; }
+      return tiles[Math.floor(Math.random() * tiles.length)];
+    };
+    // Anyone standing on a bulldozed street finds a new one.
+    for (const w of ws) {
+      if (!walk[w.from] || !walk[w.to]) {
+        const t = weightedTile();
+        if (t < 0) { w.dead = true; continue; }
+        const opts = nb(t);
+        w.from = t; w.to = opts.length ? opts[Math.floor(Math.random() * opts.length)] : t; w.t = Math.random();
+      }
+    }
+    let alive = ws.filter((w) => !w.dead);
+    for (const [tint, need] of [[C.cream, whiteN], [C.orange, orangeN]]) {
+      let have = alive.filter((w) => w.tint === tint).length;
+      // Retire the surplus from the end, hire the shortfall at busy corners.
+      for (let k = alive.length - 1; k >= 0 && have > need; k--) {
+        if (alive[k].tint === tint) { alive.splice(k, 1); have--; }
+      }
+      while (have < need) {
+        const t = weightedTile();
+        if (t < 0) break;
+        const opts = nb(t);
+        alive.push({
+          from: t, to: opts.length ? opts[Math.floor(Math.random() * opts.length)] : t,
+          t: Math.random(), off: (Math.random() - 0.5) * 0.42,
+          tint, size: alive.length % 7 === 0 ? 1.3 : 1,
+        });
+        have++;
+      }
+    }
+    // Anyone painted a colour the ledger no longer supports retires too.
+    walkersRef.current = alive.filter((w) => w.tint === C.cream || w.tint === C.orange);
+  }, [grid, status, roadCap, fund, chiefId, day, copsOut, pop, jobs]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const wrap = canvas.parentElement;
+    const ctx = canvas.getContext("2d");
+    const reduced = typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false;
+
+    // Geometry mirrors the board's style literals: 1px border, 6px padding,
+    // 2px gaps. If those change, change these.
+    const EDGE = 7, GAP = 2;
+    let px = 0, pitch = 0, cell = 0;
+    const resize = () => {
+      const dpr = Math.min(3, window.devicePixelRatio || 1);
+      px = wrap.clientWidth;
+      cell = (px - EDGE * 2 - GAP * (SIZE - 1)) / SIZE;
+      pitch = cell + GAP;
+      canvas.width = Math.round(px * dpr);
+      canvas.height = Math.round(px * dpr);
+      canvas.style.width = px + "px";
+      canvas.style.height = px + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
+    if (ro) ro.observe(wrap);
+
+    let raf = 0, last = performance.now();
+    const nb = (i, walk) => {
+      const c = i % SIZE;
+      return [i - SIZE, i + SIZE, c > 0 ? i - 1 : -1, c < SIZE - 1 ? i + 1 : -1]
+        .filter((j) => j >= 0 && j < SIZE * SIZE && walk[j]);
+    };
+    const frame = (now) => {
+      const dt = Math.min(64, now - last) / 1000;
+      last = now;
+      const W = worldRef.current;
+      ctx.clearRect(0, 0, px, px);
+      const cx = (i) => EDGE + ((i % SIZE) + 0.5) * pitch;
+      const cy = (i) => EDGE + (Math.floor(i / SIZE) + 0.5) * pitch;
+
+      // Boarded shopfronts: two planks nailed across the doorway.
+      for (const i of W.boards) {
+        const x = cx(i), y = cy(i), h = cell * 0.34;
+        ctx.strokeStyle = "#5d4a33";
+        ctx.lineWidth = Math.max(2, cell * 0.10);
+        ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(x - h, y - h); ctx.lineTo(x + h, y + h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x - h, y + h); ctx.lineTo(x + h, y - h); ctx.stroke();
+      }
+
+      // Smoke: puffs drift up and thin out. Only while the clock runs.
+      if (!reduced) {
+        const puffs = smokeRef.current;
+        if (!pausedRef.current) {
+          for (const src of W.smoke) {
+            if (puffs.length >= 140) break;
+            if (Math.random() < dt * 1.4 * src.w) {
+              puffs.push({ x: cx(src.i) + cell * (0.06 + Math.random() * 0.16),
+                y: cy(src.i) - cell * 0.22, col: src.col,
+                vx: 2 + Math.random() * 5, vy: -(9 + Math.random() * 8) * (cell / 30),
+                age: 0, life: 2.4 + Math.random() * 1.0, r: cell * 0.07 });
+            }
+          }
+          for (let k = puffs.length - 1; k >= 0; k--) {
+            const p = puffs[k];
+            p.age += dt;
+            if (p.age >= p.life) { puffs.splice(k, 1); continue; }
+            p.x += p.vx * dt; p.y += p.vy * dt;
+          }
+        }
+        for (const p of puffs) {
+          const t = p.age / p.life;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * (1 + t * 2.2), 0, Math.PI * 2);
+          ctx.fillStyle = `${p.col}${(0.26 * (1 - t)).toFixed(3)})`;
+          ctx.fill();
+        }
+      }
+
+      // The crowd outside City Hall, while a protest window is open.
+      if (protestRef.current && crowdRef.current.length) {
+        const bob = pausedRef.current || reduced ? 0 : 1;
+        for (const p of crowdRef.current) {
+          const x = cx(p.spot) + p.ox * cell + (bob ? Math.sin(now / 380 + p.ph) * cell * 0.03 : 0);
+          const y = cy(p.spot) + p.oy * cell + (bob ? Math.cos(now / 300 + p.ph) * cell * 0.025 : 0);
+          const rad = Math.max(1, cell * 0.078);
+          ctx.beginPath(); ctx.arc(x, y + rad * 0.9, rad * 1.1, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.fill();
+          ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
+          ctx.fillStyle = p.tint; ctx.fill();
+        }
+      }
+
+      // The beat: blue, leashed to their stations, gone during a walkout.
+      const REACH = 3;
+      const cops = copsRef.current;
+      for (let k = 0; k < cops.length; k++) {
+        const cop = cops[k];
+        if (!reduced && !pausedRef.current) {
+          cop.t += dt * 0.85;
+          while (cop.t >= 1) {
+            cop.t -= 1;
+            const hr = Math.floor(cop.home / SIZE), hc = cop.home % SIZE;
+            const opts = nb(cop.to, W.walk).filter((j) =>
+              Math.abs(Math.floor(j / SIZE) - hr) + Math.abs((j % SIZE) - hc) <= REACH);
+            const onward = opts.filter((j) => j !== cop.from);
+            cop.from = cop.to;
+            const pool = onward.length ? onward : opts;
+            cop.to = pool.length ? pool[Math.floor(Math.random() * pool.length)] : cop.from;
+          }
+        }
+        const r1 = Math.floor(cop.from / SIZE), c1 = cop.from % SIZE;
+        const r2 = Math.floor(cop.to / SIZE), c2 = cop.to % SIZE;
+        const horiz = r1 === r2;
+        const x = EDGE + (c1 + (c2 - c1) * cop.t + 0.5 + (horiz ? 0 : cop.off)) * pitch;
+        const y = EDGE + (r1 + (r2 - r1) * cop.t + 0.5 + (horiz ? cop.off : 0)) * pitch;
+        const rad = Math.max(1, cell * 0.078);
+        ctx.beginPath(); ctx.arc(x, y + rad * 0.9, rad * 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
+        ctx.fillStyle = C.beat; ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(18, 36, 52, 0.55)";
+        ctx.stroke();
+      }
+
+      const ws = walkersRef.current;
+      for (let k = 0; k < ws.length; k++) {
+        const w = ws[k];
+        if (!reduced && !pausedRef.current) {
+          // Past about half capacity the street slows, and people visibly
+          // bunch on exactly the tiles the traffic number is blaming.
+          const ratio = W.cap[w.from] ? W.flow[w.from] / W.cap[w.from] : 0;
+          const speed = 1.1 / (1 + Math.max(0, ratio - 0.55) * 1.9);
+          w.t += dt * speed;
+          while (w.t >= 1) {
+            w.t -= 1;
+            const opts = nb(w.to, W.walk);
+            const onward = opts.filter((j) => j !== w.from);
+            w.from = w.to;
+            const pool = onward.length ? onward : opts;
+            w.to = pool.length ? pool[Math.floor(Math.random() * pool.length)] : w.from;
+          }
+        }
+        const r1 = Math.floor(w.from / SIZE), c1 = w.from % SIZE;
+        const r2 = Math.floor(w.to / SIZE), c2 = w.to % SIZE;
+        const horiz = r1 === r2;
+        const x = EDGE + (c1 + (c2 - c1) * w.t + 0.5 + (horiz ? 0 : w.off)) * pitch - GAP / 2 + GAP / 2;
+        const y = EDGE + (r1 + (r2 - r1) * w.t + 0.5 + (horiz ? w.off : 0)) * pitch - GAP / 2 + GAP / 2;
+        const rad = Math.max(1, cell * 0.068) * w.size;
+        ctx.beginPath();
+        ctx.arc(x, y + rad * 0.9, rad * 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0,0.28)";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, y, rad, 0, Math.PI * 2);
+        ctx.fillStyle = w.tint;
+        ctx.fill();
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => { cancelAnimationFrame(raf); if (ro) ro.disconnect(); };
+  }, []);
+
+  return <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }} />;
 }
 
 export default function Luckhead() {
@@ -4960,6 +5304,11 @@ export default function Luckhead() {
         <div style={{ width: "100%", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: 6, display: "grid", gridTemplateColumns: `repeat(${SIZE}, 1fr)`, gap: 2, boxSizing: "border-box" }}>
           {st.grid.map((_, i) => <Tile key={i} i={i} />)}
         </div>
+        <WalkerLayer grid={st.grid} status={d.status} roadCap={d.roadCap} paused={speed === "pause"}
+          fund={st.fund} chiefId={st.chiefId} day={st.day} pop={Math.floor(st.pop)} jobs={d.jobs}
+          copsOut={st.cop === 3 && st.day < (st.copUntil || 0)}
+          protestOn={((st.protest === 2 || st.protest === 3) && st.day < (st.protestUntil || 0))
+            || ((st.eco === 3 || st.eco === 5) && st.day < (st.ecoUntil || 0))} />
         {speed === "pause" && !st.over && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
                         pointerEvents: "none", zIndex: 8 }}>
@@ -5479,6 +5828,11 @@ export default function Luckhead() {
           <div onClick={() => setHallMenu(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 58, padding: 12 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "min(94vw, 390px)", maxHeight: "88vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18 }}>
               <div style={{ ...disp, fontSize: 22, letterSpacing: "0.04em" }}>CITY HALL</div>
+              {MAYORS[st.mayor] && (
+                <div style={{ ...disp, fontSize: 14, color: C.orange, marginTop: 1, marginBottom: 2 }}>
+                  {MAYORS[st.mayor].icon} {MAYORS[st.mayor].name}
+                </div>
+              )}
               <div style={{ ...mono, fontSize: 10, color: C.dim, marginBottom: 4 }}>
                 Day {st.day} · {TIERS[tier].name}{!st.dictator ? ` · ${st.elected} term${st.elected === 1 ? "" : "s"} served` : ""}
               </div>
