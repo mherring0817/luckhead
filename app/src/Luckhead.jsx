@@ -129,8 +129,8 @@ const BUILD = {
   hospital:{ name: "Hospital",    cost: 420, icon: "🏥", pow: 3, jobs: 8, upkeep: 26, care: 4, hint: "Serious medicine. Lifts the whole town's health and its opinion of you." },
   prison:  { name: "Prison",      cost: 260, icon: "🏛", pow: 2, jobs: 4, upkeep: 13, hold: 2.6, gloom: 7, hint: "Calms crime townwide. Homes within 2 tiles lose 7 mood, and the grounds cost the town clean air." },
   venue:   { name: "Music Venue", cost: 180, icon: "🎸", pow: 2, jobs: 5, upkeep: 4, rev: 18, cheer: 6, rowdy: 2.5, trips: 26, hint: "Cheer and good money, but heavy traffic, +2.5 crime, and homes within 2 tiles lose mood to the noise." },
-  subway:  { name: "Subway Stop",  cost: 260, icon: "🚇", pow: 2, jobs: 2, upkeep: 14, relief: 0.85,
-    hint: "Cuts traffic hard on nearby roads and townwide. Needs a partner stop, like buses." },
+  subway:  { name: "Subway Stop",  cost: 420, icon: "🚇", pow: 2, jobs: 2, upkeep: 18, relief: 0.95,
+    hint: "Expensive, and the strongest traffic cut in the game: hard on nearby roads and townwide. Needs a partner stop, like buses." },
   bus:     { name: "Bus Station", cost: 100, icon: "🚌", pow: 1, jobs: 2, upkeep: 6, relief: 0.5, hint: "Cuts traffic on roads it touches and townwide. Useless alone; needs a partner." },
 };
 
@@ -177,9 +177,9 @@ const UPGRADES = {
   venue:   [{ name: "Concert Hall",   cost: 200, set: { jobs: 7, upkeep: 6, rev: 30, cheer: 9, rowdy: 3.5, trips: 38 } },
             { name: "Amphitheater",  cost: 330, set: { jobs: 10, upkeep: 9, rev: 46, cheer: 12, rowdy: 4.5, trips: 52, pow: 3 } },
             { name: "Arena",         cost: 520, set: { jobs: 14, upkeep: 13, rev: 68, cheer: 15, rowdy: 6, trips: 72, pow: 3 } }],
-  subway:  [{ name: "Second Platform", cost: 300, set: { jobs: 3, upkeep: 19, relief: 1.05 } },
-            { name: "Interchange",     cost: 480, set: { jobs: 4, upkeep: 25, relief: 1.3, pow: 3 } },
-            { name: "Metro Line",      cost: 720, set: { jobs: 6, upkeep: 33, relief: 1.6, pow: 3 } }],
+  subway:  [{ name: "Second Platform", cost: 380, set: { jobs: 3, upkeep: 24, relief: 1.2 } },
+            { name: "Interchange",     cost: 600, set: { jobs: 4, upkeep: 31, relief: 1.5, pow: 3 } },
+            { name: "Metro Line",      cost: 900, set: { jobs: 6, upkeep: 40, relief: 1.85, pow: 3 } }],
   bus:     [{ name: "Transit Hub",     cost: 130, set: { jobs: 3, upkeep: 8, relief: 0.68 } },
             { name: "Rail Link",       cost: 230, set: { jobs: 5, upkeep: 6, relief: 0.68, pow: 2 } },
             { name: "Central Station", cost: 380, set: { jobs: 7, upkeep: 8, relief: 0.8, pow: 2 } }],
@@ -1837,7 +1837,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
       care += (b.care || 1) * smogPenalty * crew * (MY.care || 1); medical.push([r, c]); }
     if (cell.type === "prison") { const cu = civicCost(b.upkeep); jobs += Math.max(1, b.jobs + chiefStaff); upkeep += cu; upCivic += cu; held += flags.riotOn ? 0 : (b.hold || 4) * crew * (flags.bustArrest ? 1.1 : 1) * copMul; if (b.gloom) prisons.push([r, c, b.gloom]); }
     if (cell.type === "bus" || cell.type === "subway") { const cu = civicCost(b.upkeep); jobs += b.jobs; upkeep += cu; upCivic += cu;
-      buses.push([r, c, (b.relief || 0.4) * crew * WK.transit * (MY.relief || 1), (b.relief || 0.4) * crew * WK.transit * (MY.relief || 1) * (cell.type === "subway" ? 0.165 : 0.14)]); }
+      buses.push([r, c, (b.relief || 0.4) * crew * WK.transit * (MY.relief || 1), (b.relief || 0.4) * crew * WK.transit * (MY.relief || 1) * (cell.type === "subway" ? 0.24 : 0.14)]); }
   });
 
   // Libraries and the History Center sharpen every school. The buff scales the
@@ -3992,29 +3992,70 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
         }
       }
 
-      // The bus: with a live network, one coach shuttles stop to stop.
+      // The bus: with a live network, one coach works the route, on the roads,
+      // at the same speed law as everyone else. Congestion slows the bus too,
+      // which is honest, and a little tragic.
       if (W.busIdx.length >= 2) {
-        if (!busRef.current) busRef.current = { seg: 0, t: 0, dir: 1 };
-        const bus = busRef.current;
-        if (!reduced && !pausedRef.current) {
-          bus.t += dt * 0.55;
-          while (bus.t >= 1) {
-            bus.t -= 1;
-            bus.seg += bus.dir;
-            if (bus.seg >= W.busIdx.length - 1) { bus.seg = W.busIdx.length - 1; bus.dir = -1; }
-            if (bus.seg <= 0) { bus.seg = 0; bus.dir = 1; }
+        const door = (stop) => { const o = nb(stop, W.walk); return o.length ? o[0] : -1; };
+        const bfs = (a2, b2) => {
+          if (a2 < 0 || b2 < 0) return null;
+          if (a2 === b2) return [a2];
+          const prev2 = new Array(SIZE * SIZE).fill(-1);
+          const q = [a2]; prev2[a2] = a2;
+          while (q.length) {
+            const u = q.shift();
+            for (const v of nb(u, W.walk)) {
+              if (prev2[v] >= 0) continue;
+              prev2[v] = u;
+              if (v === b2) { const path = [b2]; let p = b2; while (p !== a2) { p = prev2[p]; path.push(p); } return path.reverse(); }
+              q.push(v);
+            }
           }
+          return null;
+        };
+        const sig = W.busIdx.join(",");
+        if (!busRef.current || busRef.current.sig !== sig) {
+          const d0 = door(W.busIdx[0]), d1 = door(W.busIdx[1]);
+          const path = bfs(d0, d1);
+          busRef.current = path ? { sig, leg: 0, dir: 1, path, node: 0, t: 0 } : { sig, dead: true };
         }
-        const a = W.busIdx[Math.min(bus.seg, W.busIdx.length - 1)];
-        const b = W.busIdx[Math.min(bus.seg + Math.max(0, bus.dir), W.busIdx.length - 1)];
-        const x = cx(a) + (cx(b) - cx(a)) * bus.t;
-        const y = cy(a) + (cy(b) - cy(a)) * bus.t;
-        const lw = cell * 0.3, lh = cell * 0.18;
-        ctx.fillStyle = "#d8cfae";
-        ctx.fillRect(x - lw / 2, y - lh / 2, lw, lh);
-        ctx.strokeStyle = "rgba(20, 26, 22, 0.6)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x - lw / 2, y - lh / 2, lw, lh);
+        const bus = busRef.current;
+        if (!bus.dead) {
+          if (!reduced && !pausedRef.current) {
+            const here = bus.path[bus.node];
+            const ratio = W.cap[here] ? W.flow[here] / W.cap[here] : 0;
+            const sp = 1.1 / (1 + Math.max(0, ratio - 0.55) * 1.9);
+            bus.t += dt * sp;
+            while (bus.t >= 1) {
+              bus.t -= 1;
+              bus.node += 1;
+              if (bus.node >= bus.path.length - 1) {
+                // Arrived: turn around toward the next stop on the line.
+                bus.leg += bus.dir;
+                if (bus.leg >= W.busIdx.length - 1) { bus.leg = W.busIdx.length - 1; bus.dir = -1; }
+                if (bus.leg <= 0) { bus.leg = 0; bus.dir = 1; }
+                const from2 = door(W.busIdx[bus.leg]);
+                const to2 = door(W.busIdx[bus.leg + bus.dir] !== undefined ? W.busIdx[bus.leg + bus.dir] : W.busIdx[bus.leg]);
+                const p2 = bfs(from2, to2);
+                if (p2 && p2.length > 1) { bus.path = p2; bus.node = 0; }
+                else { bus.node = bus.path.length - 1; bus.t = 0; break; }
+              }
+            }
+          }
+          const aT = bus.path[Math.min(bus.node, bus.path.length - 1)];
+          const bT = bus.path[Math.min(bus.node + 1, bus.path.length - 1)];
+          const r1 = Math.floor(aT / SIZE), c1 = aT % SIZE;
+          const r2 = Math.floor(bT / SIZE), c2 = bT % SIZE;
+          const horiz = r1 === r2 && aT !== bT ? true : c1 === c2 && aT !== bT ? false : true;
+          const x = EDGE + (c1 + (c2 - c1) * bus.t + 0.5) * pitch;
+          const y = EDGE + (r1 + (r2 - r1) * bus.t + 0.5) * pitch;
+          const lw = cell * (horiz ? 0.32 : 0.19), lh = cell * (horiz ? 0.19 : 0.32);
+          ctx.fillStyle = "#d8cfae";
+          ctx.fillRect(x - lw / 2, y - lh / 2, lw, lh);
+          ctx.strokeStyle = "rgba(20, 26, 22, 0.6)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x - lw / 2, y - lh / 2, lw, lh);
+        }
       }
 
       // An arrest: with real crime and real coverage, a cop closes on a
