@@ -1452,7 +1452,7 @@ function freshState(seed, diff) {
   }
   const interstate = rim.length ? rim[Math.floor(rnd() * rim.length)] : -1;
 
-  return { grid, terrain, seed: useSeed, interstate, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, scored: 0, peakApproval: 0,
+  return { grid, terrain, seed: useSeed, interstate, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, fireI: -1, fireUntil: 0, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, scored: 0, peakApproval: 0,
     govStage: 0, govRel: 0, govPending: 0, govBacked: 0, govShield: 0, govTrade: 1,
     govAsk: 0, govAskDay: 0, govBuiltDay: 0, govTraffic: 1, churchGov: 1, churchGovUntil: 0, works: "balanced", lawyerId: null, lawyerOffer: 0, lawyerFrom: 0, deadLawyers: [],
     fedFavor: 0, lawyerLocked: 0, potus: 0, judyUntil: 0, judySeen: 0, commsId: null,
@@ -2560,7 +2560,11 @@ function step(prev) {
   let moodLowDays = prev.moodLowDays || 0;
   let protestsSeen = prev.protestsSeen || 0;
   if (protestUntil > 0 && day >= protestUntil) { protest = 0; protestUntil = 0; }
-  moodLowDays = baseHap < PROTEST_MOOD ? moodLowDays + mCalm : 0;
+  // Two ways a crowd forms: the town is miserable, or the mayor is. Below 20
+  // approval, people gather even on a fine day, and the fuse burns twice as
+  // fast. Mulaney's calm still slows it, but nothing stops it.
+  const streetAngry = baseHap < PROTEST_MOOD || (prev.approval || 0) < 20;
+  moodLowDays = streetAngry ? moodLowDays + mCalm * ((prev.approval || 0) < 20 ? 2 : 1) : 0;
   // Nobody marches against Quietmilk. If he already runs the department, the
   // grievance has no target and the crowd never forms.
   if (prev.chiefId === "quietmilk") moodLowDays = 0;
@@ -2903,6 +2907,9 @@ function step(prev) {
   let arsonCount = prev.arsonCount || 0;
   let lastArson = prev.arsonAck === 1 ? (prev.lastArson || null) : null;
   let arsonAck = prev.arsonAck || 0;
+  let fireI = prev.fireI !== undefined ? prev.fireI : -1;
+  let fireUntil = prev.fireUntil || 0;
+  if (fireUntil && day >= fireUntil) { fireI = -1; fireUntil = 0; }
   let arsonGrid = null;
   // The family burns things whenever you are not actually in business together:
   // open war, a refusal, or simply having never come to terms. Only a standing
@@ -2954,6 +2961,7 @@ function step(prev) {
         arsonGrid = prev.grid.slice();
         arsonGrid[target] = null;   // burned to the ground, tile left empty
         arsonCount = arsonCount + 1;
+        fireI = target; fireUntil = day + 3;   // the ruin burns for three days
         note("🔥", "ARSON", `The ${lastArson.name} burned to the ground overnight. The tile is cleared.`, "bad");
       }
       arsonDay = day;   // one attempt per cadence day regardless of outcome
@@ -2972,6 +2980,7 @@ function step(prev) {
       const hit = spots[Math.floor(evRoll(233) * spots.length)];
       const g2 = prev.grid.slice(); g2[hit] = null;
       prev = { ...prev, grid: g2 };
+      fireI = hit; fireUntil = day + 3;   // the wreck burns for three days
       if (landedEv.kills) {
         pop = Math.max(0, pop - landedEv.kills);
         note("💥", "STADIUM BOMBED", `${landedEv.kills} dead at Luckhead Stadium. The stands are gone; the vigils go on all week.`, "bad");
@@ -3161,7 +3170,7 @@ function step(prev) {
     surv, survCool, survOutcryUntil, rallyMood, rallyUntil, golfAsk, golfUntil, statueOffer, eco, ecoUntil, ecoCool, speakerDown, speakerUntil, speakerCool, tsuiLoan, tsuiLoanUntil, tsuiLoanCool, tsuiHush, staffOffer, potus, judyUntil, judySeen,
     feud, marla, marlaCool, rally, stadiumDay, slander, slanderUntil, slanderCool,
     sSchool, schoolAudit, schoolNotice, sIdle, sRed, sDisc, sPower, govStage, govPending, govAsk, govAskDay, govBuiltDay,
-    govRel: govAsk === 4 || govRelStep !== (prev.govRel || 0) ? govRelStep : (prev.govRel || 0), fund: fundKeyNow, tierSeen, tierUp, tierQuote, quotesUsed, log, logSeq, env, speech, promise, promiseDay, promiseSeq, promiseBroken, promiseKept, pop, money, broke, day, mafia, crime, calm, approval, over, elected, ledger, polled, lossWarned, unlocked, chief, smuggleOffer, venueDay, venueOffer, fed, heat, ties, reprisal, dayUnlocked, succession, tsuiReturn, event, eventEnds, eventSeen, nextEvent, challenger, lastElection, electionSeen, theatreDay, bust, pvisit, faithMeet, campaign, loanOffer, tsuiWar, chiefHit, chiefKilled, deadChiefs, vacancyReason, pendingMonument, chiefId, lawyerId, lawyerLocked, deadLawyers, backroom, justBroke: false, ice, iceUntil, graffiti, graffitiUntil, graffitiSeen, billboardDay, riot, riotUntil, riotSeen, prisonDay, viral, viralSeen, viralAck, hideawayFirstDay, blackmail, blackmailSeen, blackmailUntil: prev.blackmailUntil || 0, arsonDay, arsonCount, lastArson, arsonAck, indictWarn, protest, protestUntil, moodLowDays, protestsSeen, strike, strikeUntil, strikeCool, strikesSeen, schoolDemand, cop, copUntil, copCool, doctrine, doctrineCool, lowWarn, envWarn, homelessWarn, shooting, shootingUntil, shootingDead, shootingsSeen, invest, investCool, river, riverUntil, riverCool, riversSeen, pothole, potholeCool, potholeTile, potholesSeen, press,
+    govRel: govAsk === 4 || govRelStep !== (prev.govRel || 0) ? govRelStep : (prev.govRel || 0), fund: fundKeyNow, tierSeen, tierUp, tierQuote, quotesUsed, log, logSeq, env, speech, promise, promiseDay, promiseSeq, promiseBroken, promiseKept, pop, money, broke, day, mafia, crime, calm, approval, over, elected, ledger, polled, lossWarned, unlocked, chief, smuggleOffer, venueDay, venueOffer, fed, heat, ties, reprisal, dayUnlocked, succession, tsuiReturn, event, eventEnds, eventSeen, nextEvent, challenger, lastElection, electionSeen, theatreDay, bust, pvisit, faithMeet, campaign, loanOffer, tsuiWar, chiefHit, chiefKilled, deadChiefs, vacancyReason, pendingMonument, chiefId, lawyerId, lawyerLocked, deadLawyers, backroom, justBroke: false, ice, iceUntil, graffiti, graffitiUntil, graffitiSeen, billboardDay, riot, riotUntil, riotSeen, prisonDay, viral, viralSeen, viralAck, hideawayFirstDay, blackmail, blackmailSeen, blackmailUntil: prev.blackmailUntil || 0, arsonDay, arsonCount, lastArson, arsonAck, fireI, fireUntil, indictWarn, protest, protestUntil, moodLowDays, protestsSeen, strike, strikeUntil, strikeCool, strikesSeen, schoolDemand, cop, copUntil, copCool, doctrine, doctrineCool, lowWarn, envWarn, homelessWarn, shooting, shootingUntil, shootingDead, shootingsSeen, invest, investCool, river, riverUntil, riverCool, riversSeen, pothole, potholeCool, potholeTile, potholesSeen, press,
     peakPop: Math.max(prev.peakPop || 0, Math.floor(pop)),
     peakApproval: Math.max(prev.peakApproval || 0, Math.round(approval)), graft: (prev.graft || 0) + (mafiaMoney > 0 ? mafiaMoney : 0) };
 }
@@ -3471,13 +3480,20 @@ function makeAudio() {
 // the traffic number is built from. The canvas runs its own animation loop and
 // never touches React state: the sim re-renders once a day, the street moves
 // at sixty frames a second, and neither knows about the other.
-function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOut, protestOn, pop, jobs }) {
+function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOut, protestOn, pop, jobs, fireSite, terrain, riverBad, heat, transitOn, rallyUntil, arrestRate }) {
   const canvasRef = useRef(null);
   const worldRef = useRef({ walk: [], flow: [], cap: [], tiles: [], smoke: [], boards: [], crowdSpots: [] });
   const walkersRef = useRef([]);
   const copsRef = useRef([]);
   const crowdRef = useRef([]);
   const smokeRef = useRef([]);
+  const flamesRef = useRef([]);
+  const dustRef = useRef([]);
+  const sedanRef = useRef(null);
+  const busRef = useRef(null);
+  const arrestRef = useRef(null);
+  const lightsRef = useRef({ day: -1, until: 0 });
+  const liveRef = useRef({});
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   const protestRef = useRef(protestOn);
@@ -3532,7 +3548,43 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
         if (!isHall.has(j) && !crowdSpots.includes(j)) crowdSpots.push(j);
       });
     });
-    worldRef.current = { walk, flow, cap, tiles, smoke, boards, crowdSpots };
+    // Everything else the frame needs to know about the town, one scan.
+    const dust = [], water = [], houses = [], parks = [], golfT = [], churches = [], mons = [];
+    let hallC = -1;
+    for (let i = 0; i < N; i++) {
+      if ((terrain && terrain[i]) === 2) water.push(i);
+      const c = grid[i];
+      if (!c) continue;
+      if (c.build > 0) { dust.push(i); continue; }
+      if (c.type === "house") houses.push(i);
+      else if (c.type === "park") parks.push(i);
+      else if (c.type === "golf") golfT.push(i);
+      else if (c.type === "church") churches.push(i);
+      else if (c.type === "monument" || c.type === "statue") mons.push(i);
+      else if (c.type === "hall" && hallC < 0) hallC = i;
+    }
+    const busIdx = [];
+    if (transitOn) for (let i = 0; i < N; i++) {
+      const c = grid[i];
+      if (c && c.type === "bus" && !c.build && status && status[i] && status[i].functioning) busIdx.push(i);
+    }
+
+    // A fresh arson ruin burns hard: flames on the tile, soot in the column.
+    const fire = fireSite !== undefined && fireSite !== null && fireSite >= 0 ? fireSite : -1;
+    if (fire >= 0) smoke.push({ i: fire, w: 4.2, col: "rgba(112, 104, 88, " });
+    worldRef.current = { walk, flow, cap, tiles, smoke, boards, crowdSpots, fire,
+      dust, water, houses, parks, golfT, churches, mons, hallC, busIdx };
+    liveRef.current = { riverBad: !!riverBad, heat: heat || 0,
+      candles: day < (rallyUntil || 0), seventh: day % 7 === 0,
+      arrestRate: arrestRate || 0 };
+    // The heartbeat: at each day rollover, arm one warm second in the windows.
+    if (lightsRef.current.day !== day) {
+      if (lightsRef.current.day >= 0) lightsRef.current.until = -1;
+      lightsRef.current.day = day;
+    }
+    // The sedan parks when the file cools; the bus forgets a dead route.
+    if ((heat || 0) <= 60) sedanRef.current = null;
+    if (busIdx.length < 2) busRef.current = null;
 
     // How many people are out: the census itself, one dot per citizen,
     // capped at 240 for the canvas. WHERE they walk is still weighted by real
@@ -3554,9 +3606,10 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
       if (copsOut) return 0;
       let officers = 0;
       const homes = [];
+      // Stations and Prisons both: the same roster the wage bill staffs.
       for (let i = 0; i < N; i++) {
         const c = grid[i];
-        if (!c || c.type !== "police" || c.build) continue;
+        if (!c || (c.type !== "police" && c.type !== "prison") || c.build) continue;
         if (!(status && status[i] && status[i].functioning)) continue;
         const crew = Math.max(1, (statsOf(c).jobs || 0) + ((FUND[fund] || FUND.normal).staff || 0)
           + ((CHIEFS[chiefId] || {}).staff || 0));
@@ -3575,7 +3628,8 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
     const whiteN = whiteRaw - copMax;
     for (const cop of cops) {
       if (!walk[cop.from] || !walk[cop.to]) cop.dead = true;
-      if (!grid[cop.home] || grid[cop.home].type !== "police" || grid[cop.home].build) cop.dead = true;
+      const hb = grid[cop.home];
+      if (!hb || (hb.type !== "police" && hb.type !== "prison") || hb.build) cop.dead = true;
     }
     copsRef.current = cops.filter((c) => !c.dead).slice(0, copMax);
     if (copMax > 0) {
@@ -3639,7 +3693,7 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
     }
     // Anyone painted a colour the ledger no longer supports retires too.
     walkersRef.current = alive.filter((w) => w.tint === C.cream || w.tint === C.orange);
-  }, [grid, status, roadCap, fund, chiefId, day, copsOut, pop, jobs]);
+  }, [grid, status, roadCap, fund, chiefId, day, copsOut, pop, jobs, fireSite, terrain, riverBad, heat, transitOn, rallyUntil, arrestRate]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -3682,6 +3736,140 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
       const cx = (i) => EDGE + ((i % SIZE) + 0.5) * pitch;
       const cy = (i) => EDGE + (Math.floor(i / SIZE) + 0.5) * pitch;
 
+      const L = liveRef.current;
+
+      // The river lives: two drifting ripple strokes per water tile. During a
+      // contamination window they run a sickly brown-green instead of blue.
+      {
+        const rippleCol = L.riverBad ? "rgba(148, 156, 84, " : "rgba(152, 202, 216, ";
+        for (const i of W.water) {
+          const x = cx(i), y = cy(i);
+          for (let k = 0; k < 2; k++) {
+            const ph = (i * 1.31 + k * 2.1);
+            const dy = reduced ? (k - 0.5) * cell * 0.22 : Math.sin(now / 950 + ph) * cell * 0.2;
+            const a = 0.10 + 0.05 * (reduced ? 1 : Math.sin(now / 700 + ph));
+            ctx.strokeStyle = `${rippleCol}${a.toFixed(3)})`;
+            ctx.lineWidth = Math.max(1, cell * 0.05);
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(x - cell * 0.26, y + dy);
+            ctx.lineTo(x + cell * 0.26, y + dy);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // The heartbeat: on a day rollover the house windows glow warm for a
+      // second, so the clock is felt on the board and not just the counter.
+      if (lightsRef.current.until === -1) lightsRef.current.until = now + 1000;
+      if (!reduced && now < lightsRef.current.until) {
+        const fade = Math.min(1, (lightsRef.current.until - now) / 1000);
+        for (const i of W.houses) {
+          ctx.beginPath();
+          ctx.arc(cx(i), cy(i), cell * 0.3, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(246, 205, 122, ${(0.24 * fade).toFixed(3)})`;
+          ctx.fill();
+        }
+      }
+
+      // Construction: tan dust and a blinking amber work-light per site.
+      for (const i of W.dust) {
+        if (Math.floor(now / 450) % 2 === 0 || reduced) {
+          ctx.beginPath();
+          ctx.arc(cx(i) - cell * 0.3, cy(i) - cell * 0.3, Math.max(1, cell * 0.055), 0, Math.PI * 2);
+          ctx.fillStyle = C.amber;
+          ctx.fill();
+        }
+      }
+      if (!reduced) {
+        const dustP = dustRef.current;
+        if (!pausedRef.current) {
+          for (const i of W.dust) {
+            if (dustP.length >= 50) break;
+            if (Math.random() < dt * 1.8) {
+              dustP.push({ x: cx(i) + (Math.random() - 0.5) * cell * 0.5,
+                y: cy(i) + cell * 0.1, vx: (Math.random() - 0.5) * 9,
+                vy: -(4 + Math.random() * 5) * (cell / 30),
+                age: 0, life: 1.2 + Math.random() * 0.7, r: cell * 0.06 });
+            }
+          }
+          for (let k = dustP.length - 1; k >= 0; k--) {
+            const p = dustP[k]; p.age += dt;
+            if (p.age >= p.life) { dustP.splice(k, 1); continue; }
+            p.x += p.vx * dt; p.y += p.vy * dt;
+          }
+        }
+        for (const p of dustP) {
+          const t = p.age / p.life;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * (1 + t * 1.4), 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(214, 196, 158, ${(0.22 * (1 - t)).toFixed(3)})`;
+          ctx.fill();
+        }
+      }
+
+      // Sunday: churches carry a soft gold ring every seventh day.
+      if (L.seventh) {
+        for (const i of W.churches) {
+          const pulse = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(now / 600 + i);
+          ctx.beginPath();
+          ctx.arc(cx(i), cy(i), cell * (0.3 + 0.1 * pulse), 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(232, 176, 75, ${(0.12 + 0.1 * pulse).toFixed(3)})`;
+          ctx.lineWidth = Math.max(1, cell * 0.04);
+          ctx.stroke();
+        }
+      }
+
+      // Candlelight at the memorials while the town holds its vigils.
+      if (L.candles) {
+        for (const i of W.mons) {
+          for (let k = 0; k < 3; k++) {
+            const fx = cx(i) + (k - 1) * cell * 0.2;
+            const fy = cy(i) + cell * 0.26;
+            const fl = reduced ? 0.7 : 0.55 + 0.35 * Math.sin(now / 95 + k * 2.2 + i);
+            ctx.beginPath();
+            ctx.arc(fx, fy, Math.max(0.8, cell * 0.04), 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(246, 201, 107, ${fl.toFixed(3)})`;
+            ctx.fill();
+          }
+        }
+      }
+
+      // Birds over the parks: two-stroke wings on a slow loop.
+      if (!reduced) {
+        for (let b = 0; b < Math.min(6, W.parks.length); b++) {
+          const i = W.parks[b];
+          const ang = now / 1400 + i * 1.7;
+          const bx = cx(i) + Math.cos(ang) * cell * 0.34;
+          const by = cy(i) + Math.sin(ang) * cell * 0.22 - cell * 0.2;
+          const flap = Math.sin(now / 130 + i) * cell * 0.05;
+          ctx.strokeStyle = "rgba(38, 46, 40, 0.75)";
+          ctx.lineWidth = Math.max(1, cell * 0.035);
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(bx - cell * 0.07, by - flap);
+          ctx.lineTo(bx, by);
+          ctx.lineTo(bx + cell * 0.07, by - flap);
+          ctx.stroke();
+        }
+      }
+
+      // A white ball arcs down the fairway every few seconds.
+      if (!reduced) {
+        for (const i of W.golfT) {
+          const cyc = ((now / 6000) + i * 0.37) % 1;
+          if (cyc < 0.22) {
+            const t = cyc / 0.22;
+            const gx = cx(i) + (t - 0.5) * cell * 0.62;
+            const gy = cy(i) - Math.sin(Math.PI * t) * cell * 0.34;
+            ctx.beginPath();
+            ctx.arc(gx, gy, Math.max(0.9, cell * 0.035), 0, Math.PI * 2);
+            ctx.fillStyle = "#f4f1e4";
+            ctx.fill();
+          }
+        }
+      }
+
       // Boarded shopfronts: two planks nailed across the doorway.
       for (const i of W.boards) {
         const x = cx(i), y = cy(i), h = cell * 0.34;
@@ -3721,6 +3909,32 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
         }
       }
 
+      // Flames on the arson site: a fast, flickering column that dies to red.
+      if (!reduced && W.fire >= 0) {
+        const flames = flamesRef.current;
+        if (!pausedRef.current) {
+          if (flames.length < 40 && Math.random() < dt * 24) {
+            flames.push({ x: cx(W.fire) + (Math.random() - 0.5) * cell * 0.5,
+              y: cy(W.fire) + cell * 0.18,
+              vx: (Math.random() - 0.5) * 7, vy: -(28 + Math.random() * 26) * (cell / 30),
+              age: 0, life: 0.5 + Math.random() * 0.45, r: cell * (0.06 + Math.random() * 0.06) });
+          }
+          for (let k = flames.length - 1; k >= 0; k--) {
+            const f = flames[k];
+            f.age += dt;
+            if (f.age >= f.life) { flames.splice(k, 1); continue; }
+            f.x += f.vx * dt; f.y += f.vy * dt;
+          }
+        }
+        for (const f of flames) {
+          const t = f.age / f.life;
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, Math.max(0.6, f.r * (1 - t * 0.5)), 0, Math.PI * 2);
+          ctx.fillStyle = t < 0.35 ? C.amber : t < 0.7 ? C.orange : C.red;
+          ctx.fill();
+        }
+      } else if (W.fire < 0 && flamesRef.current.length) flamesRef.current = [];
+
       // The crowd outside City Hall, while a protest window is open.
       if (protestRef.current && crowdRef.current.length) {
         const bob = pausedRef.current || reduced ? 0 : 1;
@@ -3735,6 +3949,113 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
         }
       }
 
+      // The Bureau sedan: past 60 heat, a slow grey car circles the blocks
+      // near City Hall. It does nothing. It is just there.
+      if (L.heat > 60 && W.hallC >= 0) {
+        const hr = Math.floor(W.hallC / SIZE), hc = W.hallC % SIZE;
+        const near = (j) => Math.abs(Math.floor(j / SIZE) - hr) + Math.abs((j % SIZE) - hc) <= 3;
+        if (!sedanRef.current) {
+          const beatT = W.tiles.filter(near);
+          if (beatT.length) {
+            const t0 = beatT[0];
+            const opts = nb(t0, W.walk).filter(near);
+            sedanRef.current = { from: t0, to: opts.length ? opts[0] : t0, t: 0 };
+          }
+        }
+        const sd = sedanRef.current;
+        if (sd) {
+          if (!reduced && !pausedRef.current) {
+            sd.t += dt * 0.5;
+            while (sd.t >= 1) {
+              sd.t -= 1;
+              const opts = nb(sd.to, W.walk).filter(near);
+              const onward = opts.filter((j) => j !== sd.from);
+              sd.from = sd.to;
+              const pool = onward.length ? onward : opts;
+              sd.to = pool.length ? pool[Math.floor(Math.random() * pool.length)] : sd.from;
+            }
+          }
+          if (!W.walk[sd.from] || !W.walk[sd.to]) sedanRef.current = null;
+          else {
+            const r1 = Math.floor(sd.from / SIZE), c1 = sd.from % SIZE;
+            const r2 = Math.floor(sd.to / SIZE), c2 = sd.to % SIZE;
+            const horiz = r1 === r2;
+            const x = EDGE + (c1 + (c2 - c1) * sd.t + 0.5) * pitch;
+            const y = EDGE + (r1 + (r2 - r1) * sd.t + 0.5) * pitch;
+            const lw = cell * (horiz ? 0.36 : 0.2), lh = cell * (horiz ? 0.2 : 0.36);
+            ctx.fillStyle = "#8b8f8a";
+            ctx.fillRect(x - lw / 2, y - lh / 2, lw, lh);
+            ctx.strokeStyle = "rgba(20, 26, 22, 0.6)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x - lw / 2, y - lh / 2, lw, lh);
+          }
+        }
+      }
+
+      // The bus: with a live network, one coach shuttles stop to stop.
+      if (W.busIdx.length >= 2) {
+        if (!busRef.current) busRef.current = { seg: 0, t: 0, dir: 1 };
+        const bus = busRef.current;
+        if (!reduced && !pausedRef.current) {
+          bus.t += dt * 0.55;
+          while (bus.t >= 1) {
+            bus.t -= 1;
+            bus.seg += bus.dir;
+            if (bus.seg >= W.busIdx.length - 1) { bus.seg = W.busIdx.length - 1; bus.dir = -1; }
+            if (bus.seg <= 0) { bus.seg = 0; bus.dir = 1; }
+          }
+        }
+        const a = W.busIdx[Math.min(bus.seg, W.busIdx.length - 1)];
+        const b = W.busIdx[Math.min(bus.seg + Math.max(0, bus.dir), W.busIdx.length - 1)];
+        const x = cx(a) + (cx(b) - cx(a)) * bus.t;
+        const y = cy(a) + (cy(b) - cy(a)) * bus.t;
+        const lw = cell * 0.3, lh = cell * 0.18;
+        ctx.fillStyle = "#d8cfae";
+        ctx.fillRect(x - lw / 2, y - lh / 2, lw, lh);
+        ctx.strokeStyle = "rgba(20, 26, 22, 0.6)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x - lw / 2, y - lh / 2, lw, lh);
+      }
+
+      // An arrest: with real crime and real coverage, a cop closes on a
+      // civilian and walks them to the nearest station. Both vanish at the
+      // door; the census refills tomorrow. One at a time, citywide.
+      {
+        const civs = walkersRef.current;
+        const copsA = copsRef.current;
+        const distT = (a2, b2) => Math.abs(Math.floor(a2 / SIZE) - Math.floor(b2 / SIZE)) + Math.abs((a2 % SIZE) - (b2 % SIZE));
+        if (!arrestRef.current && !reduced && !pausedRef.current && copsA.length && civs.length
+            && Math.random() < dt * L.arrestRate * 0.25) {
+          const perp = civs[Math.floor(Math.random() * civs.length)];
+          let cop = copsA[0];
+          for (const c2 of copsA) if (distT(c2.from, perp.from) < distT(cop.from, perp.from)) cop = c2;
+          perp.held = true;
+          arrestRef.current = { cop, perp, phase: "chase" };
+        }
+        const ar = arrestRef.current;
+        if (ar) {
+          const gone = !civs.includes(ar.perp) || !copsA.includes(ar.cop);
+          if (gone) { if (ar.perp) ar.perp.held = false; if (ar.cop) ar.cop.goal = undefined; arrestRef.current = null; }
+          else if (ar.phase === "chase") {
+            ar.cop.goal = ar.perp.from;
+            if (distT(ar.cop.from, ar.perp.from) <= 1) {
+              ar.phase = "escort";
+              const home = ar.cop.home;
+              const doors = W.tiles.filter((t2) => distT(t2, home) <= 1);
+              ar.door = doors.length ? doors[0] : ar.cop.from;
+            }
+          } else if (ar.phase === "escort") {
+            ar.cop.goal = ar.door;
+            ar.perp.from = ar.cop.from; ar.perp.to = ar.cop.to; ar.perp.t = ar.cop.t;
+            if (ar.cop.from === ar.door) {
+              walkersRef.current = civs.filter((w2) => w2 !== ar.perp);
+              ar.cop.goal = undefined;
+              arrestRef.current = null;
+            }
+          }
+        }
+      }
+
       // The beat: blue, leashed to their stations, gone during a walkout.
       const REACH = 3;
       const cops = copsRef.current;
@@ -3745,12 +4066,18 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
           while (cop.t >= 1) {
             cop.t -= 1;
             const hr = Math.floor(cop.home / SIZE), hc = cop.home % SIZE;
-            const opts = nb(cop.to, W.walk).filter((j) =>
-              Math.abs(Math.floor(j / SIZE) - hr) + Math.abs((j % SIZE) - hc) <= REACH);
+            const leash = (j) => Math.abs(Math.floor(j / SIZE) - hr) + Math.abs((j % SIZE) - hc) <= REACH;
+            let opts = nb(cop.to, W.walk);
+            if (cop.goal === undefined) opts = opts.filter(leash);
             const onward = opts.filter((j) => j !== cop.from);
             cop.from = cop.to;
-            const pool = onward.length ? onward : opts;
-            cop.to = pool.length ? pool[Math.floor(Math.random() * pool.length)] : cop.from;
+            let pool = onward.length ? onward : opts;
+            if (cop.goal !== undefined && pool.length) {
+              let best = pool[0];
+              const dg = (j) => Math.abs(Math.floor(j / SIZE) - Math.floor(cop.goal / SIZE)) + Math.abs((j % SIZE) - (cop.goal % SIZE));
+              for (const o of pool) if (dg(o) < dg(best)) best = o;
+              cop.to = best;
+            } else cop.to = pool.length ? pool[Math.floor(Math.random() * pool.length)] : cop.from;
           }
         }
         const r1 = Math.floor(cop.from / SIZE), c1 = cop.from % SIZE;
@@ -3773,9 +4100,10 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
         const w = ws[k];
         if (!reduced && !pausedRef.current) {
           // Past about half capacity the street slows, and people visibly
-          // bunch on exactly the tiles the traffic number is blaming.
+          // bunch on exactly the tiles the traffic number is blaming. A
+          // civilian with an officer closing on them stops walking.
           const ratio = W.cap[w.from] ? W.flow[w.from] / W.cap[w.from] : 0;
-          const speed = 1.1 / (1 + Math.max(0, ratio - 0.55) * 1.9);
+          const speed = (w.held ? 0.15 : 1) * 1.1 / (1 + Math.max(0, ratio - 0.55) * 1.9);
           w.t += dt * speed;
           while (w.t >= 1) {
             w.t -= 1;
@@ -5306,9 +5634,13 @@ export default function Luckhead() {
         </div>
         <WalkerLayer grid={st.grid} status={d.status} roadCap={d.roadCap} paused={speed === "pause"}
           fund={st.fund} chiefId={st.chiefId} day={st.day} pop={Math.floor(st.pop)} jobs={d.jobs}
+          fireSite={st.day < (st.fireUntil || 0) ? st.fireI : -1}
           copsOut={st.cop === 3 && st.day < (st.copUntil || 0)}
           protestOn={((st.protest === 2 || st.protest === 3) && st.day < (st.protestUntil || 0))
-            || ((st.eco === 3 || st.eco === 5) && st.day < (st.ecoUntil || 0))} />
+            || ((st.eco === 3 || st.eco === 5) && st.day < (st.ecoUntil || 0))}
+          terrain={st.terrain} riverBad={st.river === 2 && st.day < (st.riverUntil || 0)}
+          heat={st.heat || 0} transitOn={!!d.transit} rallyUntil={st.rallyUntil || 0}
+          arrestRate={Math.max(0, (st.crime || 0) / 100) * (d.policeFrac || 0)} />
         {speed === "pause" && !st.over && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
                         pointerEvents: "none", zIndex: 8 }}>
