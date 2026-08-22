@@ -101,6 +101,8 @@ const BUILD = {
   school:  { name: "School",      cost: 130, icon: "🏫", pow: 1, jobs: 4, upkeep: 5, learn: 1, hint: "Draws newcomers, +approval, -0.6 crime, and raises the tax take from homes within 3 tiles. Maximum of 3." },
   mansion: { name: "Governor's Mansion", cost: 740, icon: "\uD83C\uDFDB\uFE0F", pow: 3, jobs: 5, upkeep: 26,
     hint: "Needs to stand inside a police beat or the state will not use it. Sanders is a Conservative Tax man. Keep the city on Conservative Tax and the mansion earns you standing with him every day it stands; switch to No Tax or Progressive Tax and it earns you nothing, and provides a wonderful field trip destination for local schools. One only." },
+  union:     { name: "Union Hall",     cost: 190, icon: "\u270A", pow: 1, jobs: 2, upkeep: 4,
+             hint: "Organised labour. Teachers and police argue instead of walking out, but your factory floor gets a voice it did not have before." },
   histcenter:{ name: "History Center", cost: 420, icon: "🏛", pow: 2, jobs: 4, upkeep: 11, edu: 0.6,
     hint: "An archive, a reading room, and the town's own story under one roof. Sharpens every school in Luckhead. Needs 4 staff." },
   stadium: { name: "Stadium",     cost: 1400, icon: "🏟️", pow: 4, jobs: 10, upkeep: 20, rev: 120, crime: 5,
@@ -190,7 +192,7 @@ const UPGRADES = {
 const BUILD_DAYS = { house: 3, park: 3, factory: 9, road: 0, line: 0, bridge: 3, theatre: 7, hideaway: 7, plaza: 7, fastpark: 7, mansion: 7, histcenter: 8, stadium: 10, hall: 0, hallpart: 0 };
 const SPECIALTY = new Set(["theatre", "hideaway", "plaza", "fastpark", "mansion"]);
 // Buildings the town will only tolerate so many of.
-const BUILD_CAP = { church: 3, speaker: 3, bank: 3, billboard: 3, school: 3, stadium: 1, histcenter: 1, mansion: 1, golf: 2 };
+const BUILD_CAP = { church: 3, speaker: 3, bank: 3, billboard: 3, school: 3, stadium: 1, histcenter: 1, mansion: 1, golf: 2, union: 1 };
 const buildDays = (t) => (BUILD_DAYS[t] !== undefined ? BUILD_DAYS[t] : 5);
 const upgradeDays = (t) => Math.ceil(buildDays(t) / 2);
 
@@ -283,7 +285,7 @@ const investedIn = (cell) => {
   for (let k = 0; k < (cell.lv || 0); k++) total += UPGRADES[cell.type][k].cost;
   return Math.round(total * COST_SCALE);
 };
-const BUILD_KEYS = ["road", "bridge", "line", "house", "shop", "factory", "plant", "park", "tavern", "church", "police", "camera", "school", "bus", "venue", "clinic", "hospital", "prison", "histcenter", "mansion", "stadium", "golf", "speaker", "billboard", "bank", "subway", "theatre", "hideaway", "plaza", "fastpark"];
+const BUILD_KEYS = ["road", "bridge", "line", "house", "shop", "factory", "plant", "park", "tavern", "church", "police", "camera", "school", "bus", "venue", "clinic", "hospital", "prison", "union", "histcenter", "mansion", "stadium", "golf", "speaker", "billboard", "bank", "subway", "theatre", "hideaway", "plaza", "fastpark"];
 const UNLOCK_DAY = { speaker: 40, billboard: 40, camera: 100, bank: 70 };
 // Day-gated unlocks, announced the same way population ones are. Keep this in
 // ascending day order for the same reason the population list is ordered: the
@@ -419,8 +421,9 @@ const MAYORS = {
     blurb: "Charismatic and big business. His don't-rock-the-boat attitude plays well in every room.",
     effects: ["Industrial revenue +10%",
               "Starts at +1 standing with the Governor",
-              "Nothing quite boils over: protests, strikes and public outcries are 30% rarer"],
-    ind: 1.1, govRel: 1, calm: 0.7 },
+              "Nothing quite boils over: protests, strikes and public outcries are 30% rarer",
+              "Smooth Talker- Mulaney has better chances of positive reactions in debates"],
+    ind: 1.1, govRel: 1, calm: 0.7, smooth: 0.7 },
   debbs: { name: "Mayor Debbs", icon: "✊",
     blurb: "A firebrand with a leftward lean. The program is the program, and the program is not negotiable.",
     effects: ["Tax policy locked to High Tax",
@@ -431,6 +434,38 @@ const MAYORS = {
     ind: 0.9, shop: 0.9, care: 1.25, learn: 1.25, msg: 1.25, relief: 1.25, green: 1.25, mood: 4, fedFavor: -1, taxLock: "high" },
 };
 
+// ---- twists: optional handicaps picked at the door, paid back in score ----
+const MUTATORS = {
+  recession: { name: "THE RECESSION", icon: "\uD83D\uDCC9", mult: 1.25,
+    blurb: "Every business dollar is one fifth lighter. Shops, factories, venues, trade, all of it.",
+    revMul: 0.8 },
+  cleanhands: { name: "CLEAN HANDS", icon: "\uD83E\uDDFC", mult: 1.2,
+    blurb: "The family never calls. No alliance, no rigging, no loans from Vincent." },
+  pandemic: { name: "PANDEMIC MODE", icon: "\uD83E\uDDA0", mult: 1.4,
+    blurb: "Shops earn half, schools teach half, the streets stay angry no matter the polls, crime runs warmer, and at least the roads are quiet.",
+    shopMul: 0.5, learnMul: 0.5, flowMul: 0.8, crimeRow: 6 },
+  pariah: { name: "THE PARIAH", icon: "\uD83E\uDD76", mult: 1.2,
+    blurb: "Somebody in this office insulted everybody. Start one step down with the Governor and the President both." },
+  crowded: { name: "A CROWDED CALENDAR", icon: "\uD83D\uDCC6", mult: 1.25,
+    blurb: "Trouble runs on a tighter schedule. Random events come around half again as often.",
+    eventMul: 0.55 },
+  grudge: { name: "THE LONG MEMORY", icon: "\uD83D\uDC18", mult: 1.3,
+    blurb: "No honeymoon, ever, and the years in office wear half again as heavy." },
+};
+const MUT_KEYS = ["recession", "cleanhands", "pandemic", "pariah", "crowded", "grudge"];
+const MUT_MAX = 2;
+
+const WAREHOUSE_REACH = 3;       // how far the family's routes run from their own door
+const RAID_REACH = 2;            // how close a station has to be to mount one
+const RAID_ODDS = 0.5;           // with nobody in the chief's chair. Each chief overrides it.
+const RAID_CRIME_DROP = 22;      // what shuttering the place is worth
+const RAID_COOL = 45;            // before the department will try that again
+const RAID_HOLD_COOL = 20;       // and how long a warrant sits in the drawer
+const RAID_TOLL_MIN = 3;         // officers who do not come home from a bad one
+const RAID_TOLL_MAX = 8;
+const RAID_SHOCK = 20;           // days the town carries the funerals
+const RAID_MOOD = 5;             // and what that costs the mood while it does
+const TSUI_TRUCE = 90;           // how long the family stays away after losing their house
 const TSUI_LOAN_TRIGGER = 500;   // treasury low-water mark that brings the offer
 const TSUI_LOAN_AMOUNT = 2000;
 const TSUI_LOAN_DAYS = 90;       // how long the force stays gutted afterward
@@ -612,18 +647,18 @@ const CHIEF_SHAKE_DAYS = 15;
 const CHIEFS = {
   jenkins: { name: "Leroy Jenkins", icon: "🤝", salary: 6,
     line: "Came up through the neighborhoods, knows everyone, owes most of them.",
-    staff: +2, police: 1, entRev: 1, mood: 0, approval: -2, crime: 5, tsuiStations: 2,
+    staff: +2, police: 1, entRev: 1, mood: 0, approval: -2, crime: 5, tsuiStations: 2, raid: 0.15,
     crimeLabel: "Chief Jenkins, looking the other way",
-    effects: ["Tsui family pays the build cost AND upkeep of 2 Police Stations", "+2 staff needed at every Station and Prison", "+5 crime", "-2 approval", "Counts as a federal entanglement", "$6 a day", "With a Jenkins in City Hall: the family covers a third station"] },
+    effects: ["Tsui family pays the build cost AND upkeep of 2 Police Stations", "+2 staff needed at every Station and Prison", "+5 crime", "-2 approval", "Counts as a federal entanglement", "$6 a day", "His people talk to the family: a raid on the warehouse almost never lands", "With a Jenkins in City Hall: the family covers a third station"] },
   mcgurk: { name: "Dirk McGurk", icon: "🔨", salary: 15,
     line: "Kicks doors first. The doors have stopped complaining.",
-    staff: 0, police: 1.2, entRev: 0.9, mood: 0, approval: -4, crime: 0,
-    effects: ["Police and Prisons 20% harder on crime", "Venues and Taverns earn 10% less", "-4 approval", "$15 a day"] },
+    staff: 0, police: 1.2, entRev: 0.9, mood: 0, approval: -4, crime: 0, raid: 0.7,
+    effects: ["Police and Prisons 20% harder on crime", "Venues and Taverns earn 10% less", "-4 approval", "A raid on the warehouse usually lands", "$15 a day"] },
   quietmilk: { name: "Charles Quietmilk", icon: "🕊️", salary: 10,
     line: "Believes in second chances, block parties, and a light touch.",
-    staff: -1, police: 1, entRev: 1.1, mood: +2, approval: 0, crime: 2.5,
+    staff: -1, police: 1, entRev: 1.1, mood: +2, approval: 0, crime: 2.5, raid: 0.3,
     crimeLabel: "Chief Quietmilk, community first",
-    effects: ["1 fewer staff at every Station and Prison", "Venues and Taverns earn 10% more", "+2 happiness", "+2.5 crime", "$10 a day"] },
+    effects: ["1 fewer staff at every Station and Prison", "Venues and Taverns earn 10% more", "+2 happiness", "+2.5 crime", "A raid on the warehouse rarely lands", "$10 a day"] },
 };
 
 // ---- election challengers ----
@@ -690,6 +725,17 @@ function makeChallenger(seed, cycle, ctx) {
   const L = AXES[axis].label;
   return { name, axis, label: typeof L === "function" ? L(ctx) : L };
 }
+function debateTopics(ctx) {
+  // Same rule makeChallenger uses to pick the one worst true thing, just not
+  // stopping at the first: the priority order in AXIS_ORDER over raw severity,
+  // so round one always matches the line already driving the daily attack.
+  return AXIS_ORDER.filter((k) => AXES[k].test(ctx)).slice(0, DEBATE_TOPICS_MAX)
+    .map((k) => ({ key: k, label: typeof AXES[k].label === "function" ? AXES[k].label(ctx) : AXES[k].label }));
+}
+function raidOdds(S) {
+  const C0 = CHIEFS[S.chiefId];
+  return C0 && C0.raid !== undefined ? C0.raid : RAID_ODDS;
+}
 function challengerAttack(ch, ctx) {
   if (!ch || !AXES[ch.axis]) return { drag: 0, live: false };
   const live = AXES[ch.axis].test(ctx);
@@ -715,12 +761,15 @@ function approvalRows(S, d, hap) {
   if (CHF && CHF.mood) push(`Chief ${CHF.name.split(" ").pop()}, mood`, CHF.mood);
   if (EV && EV.mood) push(`Event mood: ${EV.name}`, EV.mood);
   const DP = diffOf(S.diff);
-  const HM = DP.politics.honeymoon, FT = DP.politics.fatigue;
+  const grudge = (S.mutators || []).includes("grudge");
+  const HM = DP.politics.honeymoon * (grudge ? 0 : 1), FT = DP.politics.fatigue * (grudge ? 1.5 : 1);
   const since = S.dictator
     ? Math.floor((S.day - 1) / TERM_DAYS)
     : (S.elected || 0) - (S.honeymoonAt || 0);
-  // A successor inherits the chair, not the benefit of the doubt.
-  const inherited = (S.heirCount || 0) > 0 ? 0.7 : 1;
+  // A successor inherits the chair, not the benefit of the doubt. Goodwill
+  // belongs to the mayor the town actually voted for; once the office has
+  // passed by succession, the row never comes back.
+  const inherited = (S.heirCount || 0) > 0 ? 0 : 1;
   push("New administration goodwill", (since === 0 ? HM
     : since === 1 ? Math.max(0, HM * (1 - ((S.day % TERM_DAYS) / TERM_DAYS))) : 0) * inherited);
   push(`Time in office (${since} term${since === 1 ? "" : "s"})`, -Math.min(FATIGUE_CAP, FT * since));
@@ -827,6 +876,8 @@ function crimeLedgerRows(S, d) {
   if (d.taverns) push(`Taverns (${d.taverns})`, 2 * d.taverns);
   if (d.shops) push(`Shops (${d.shops})`, 0.12 * d.shops);
   if (d.traffic > 0.15) push(`Traffic (${Math.round(d.traffic * 100)}%)`, 2.5 * d.traffic);
+  if (S.whHot) push("The Tsui warehouse, unfriendly", 8);
+  if (S.pandemic) push("Pandemic conditions", MUTATORS.pandemic.crimeRow);
   if (d.highwayOn) push("Interstate access", HIGHWAY_CRIME);
   if (d.stadiumCrime) push("Stadium crowds", d.stadiumCrime);
   if (d.rowdiness) push("Venue crowds", d.rowdiness);
@@ -880,7 +931,8 @@ function legacyScore(st) {
   if (halved) base = Math.round(base * 0.5);
   base = Math.max(0, base);
   const mult = scoreMult(st.diff);
-  const total = Math.round(base * mult);
+  const mutMult = (st.mutators || []).reduce((a, id) => a * ((MUTATORS[id] || {}).mult || 1), 1);
+  const total = Math.round(base * mult * mutMult);
   const title = st.broke ? "THE LIQUIDATOR"
     : st.arrested ? "THE CONVICT"
     : st.fed === 2 ? "THE DEFENDANT"
@@ -890,7 +942,7 @@ function legacyScore(st) {
     : total >= 1800 ? "A RESPECTABLE RUN"
     : total >= 800 ? "ONE OF THE BRIEFER MAYORS"
     : "A FOOTNOTE";
-  return { items, base, mult, total, halved, title };
+  return { items, base, mult, mutMult, muts: st.mutators || [], total, halved, title };
 }
 
 const SAVE_KEY = "buckhead-save";  // unchanged so saves from before the rename still load
@@ -1143,7 +1195,8 @@ const HEIR_KEYS = ["populist", "conservative", "green"];
 // police does the reverse. Both hold until the next vote.
 const protestFlags = (st) => ({
   protestMood: (st.protest === 2 ? 9 : 0)
-    - (st.day < (st.shootingUntil || 0) ? 5 : 0),
+    - (st.day < (st.shootingUntil || 0) ? 5 : 0)
+    - (st.day < (st.raidUntil || 0) ? RAID_MOOD : 0),
   // Agreeing with the President that your own town is a dump does not go down
   // well at roll call. It stacks with whatever the protests have already done.
   protestMul: (st.protest === 2 ? 0.7 : st.protest === 3 ? 1.25 : 1)
@@ -1172,6 +1225,8 @@ const faithFlags = (st) => ({
 const strikeFlags = (st) => ({
   schoolsShut: st.strike === 3 && st.day < (st.strikeUntil || 0),
   wageMul: st.wageMul || 1,
+  factoryWage: st.factoryWage || 1,
+  linesShut: st.fstrike === 3 && st.day < (st.fstrikeUntil || 0),
 });
 const LOW_APPROVAL_WARN = 30;   // below this the game stops and offers a plan
 const HOMELESS_WARN = 0.05;     // rough sleeping past this gets a warning
@@ -1187,6 +1242,13 @@ const STRIKE_ODDS = 1 / 200;   // a walkout lands roughly every 200 days
 const STRIKE_SHUT = 60;        // days the schools stay dark if you wait it out
 const STRIKE_COOL = 150;       // quiet stretch before the union can strike again
 const STRIKE_RAISE = 1.5;      // what a settled contract does to school upkeep
+const UNION_FACTORIES = 2;     // an industrial working class has to exist first
+const UNION_WAIT = 20;         // and then it takes a while to organise
+const UNION_CALM = 0.5;        // an organised town argues instead of walking out
+const FSTRIKE_ODDS = 1 / 190;  // how often the floor wants a contract
+const FSTRIKE_SHUT = 30;       // days the lines stand idle if you refuse
+const FSTRIKE_COOL = 150;      // quiet stretch before they ask again
+const FSTRIKE_RAISE = 1.4;     // what a settled floor contract does to factory upkeep
 const RIVER_ODDS = 1 / 200;     // per factory-pair, past RIVER_DAY
 const RIVER_DAY = 80;
 const RIVER_COOL = 220;         // a long quiet stretch; this is not a recurring tax
@@ -1386,6 +1448,13 @@ const SILENCE_ODDS = 0.30;     // the chance it works. the rest of the time you 
 const SILENCE_DAYS = 90;       // how long the payments and the rumours run
 const SILENCE_RATE = 25;       // a day, to keep it quiet
 const SILENCE_DRAG = 5;        // approval, every day the rumours are alive
+const DEBATE_DAY = 16;         // days out the debate happens, once per challenger
+const DEBATE_TOPICS_MAX = 3;   // most lines of questioning in one night
+const DEBATE_OWN_PTS = 1;      // points either way on the straight answer
+const DEBATE_OWN_ODDS = 0.5;   // and the odds it lands rather than falling flat
+const DEBATE_FIGHT_ODDS = 0.5; // roughly even odds, same family as the podium
+const DEBATE_FIGHT_WIN = 3;    // points if a swing answer lands
+const DEBATE_FIGHT_LOSE = -2;  // points if it does not
 const WARN_DAY = 20;    // poll lands twenty days before each vote
 const LOSS_WARN_DAY = 15;   // sharper alert if you are behind with the vote near
 const MAFIA_FLAVOR = [
@@ -1470,7 +1539,20 @@ function freshState(seed, diff) {
   }
   const interstate = rim.length ? rim[Math.floor(rnd() * rim.length)] : -1;
 
-  return { grid, terrain, seed: useSeed, interstate, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, termShift: 0, runoff: 0, runoffCount: 0, tsuiSilence: 0, silenceSeen: 0, silenceUntil: 0, oppOut: 0, arrested: false, tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, fireI: -1, fireUntil: 0, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, scored: 0, peakApproval: 0,
+  // The family's warehouse. It is on the map before you are, it is not yours,
+  // and where it sits decides which half of town can take their money.
+  const whSpots = [];
+  for (let r = 1; r < SIZE - 1; r++) {
+    for (let c = 1; c < SIZE - 1; c++) {
+      const idx = at0(r, c);
+      if (terrain[idx] === WATER || grid[idx] || idx === interstate) continue;
+      if (Math.abs(r - 5.5) <= 2 && Math.abs(c - 5.5) <= 2) continue;   // give City Hall its room
+      whSpots.push(idx);
+    }
+  }
+  const warehouse = whSpots.length ? whSpots[Math.floor(rnd() * whSpots.length)] : -1;
+
+  return { grid, terrain, seed: useSeed, interstate, warehouse, raid: 0, whShut: 0, raidCool: 0, raidUntil: 0, raidsFailed: 0, diff: DF, money: DIFFICULTY.economy[DF.economy].cash, pop: 4, day: 1, seq: 20, mafia: "none", crime: 0, calm: 0, approval: 60, env: START_ENV, over: false, elected: 0, deal: 0, nextTalk: 0, ledger: [], tax: "normal", fund: "normal", polled: 0, rigged: 0, unlocked: 0, gear: false, chief: 0, smuggleOffer: 0, venueDay: 0, venueOffer: 0, backroom: false, fed: 0, heat: 0, ties: 0, testified: false, reprisal: 0, dayUnlocked: 0, heir: null, succession: 0, honeymoonAt: 0, tsuiReturn: 0, event: null, eventEnds: 0, eventSeen: 0, nextEvent: EVENT_EVERY, hintsSeen: [], lossWarned: 0, peakPop: 4, graft: 0, heirCount: 0, challenger: null, lastElection: null, electionSeen: 0, termShift: 0, runoff: 0, runoffCount: 0, tsuiSilence: 0, silenceSeen: 0, silenceUntil: 0, oppOut: 0, arrested: false, debate: 0, mutators: [], tsuiWar: 0, chiefHit: 0, chiefKilled: 0, deadChiefs: [], vacancyReason: "opening", justBroke: false, pendingMonument: null, monuments: [], broke: false, theatreDay: 0, bust: 0, bustUntil: 0, chiefId: null, chiefShake: 0, pvisit: 0, faithMeet: 0, faithStance: "none", loans: 0, loanOffer: 0, bribes: 0, bribeLocal: [], bribeTrade: [], bribeStain: [], campaign: 0, campaignUntil: 0, modalGap: 0, ice: 0, iceUntil: 0, graffiti: 0, graffitiUntil: 0, graffitiSeen: 0, billboardDay: 0, riot: 0, riotUntil: 0, riotSeen: 0, prisonDay: 0, viral: 0, viralSeen: 0, viralAck: 0, hideawayFirstDay: 0, blackmail: 0, blackmailSeen: 0, blackmailUntil: 0, firstHeirDay: 0, arsonDay: 0, arsonCount: 0, lastArson: null, fireI: -1, fireUntil: 0, arsonAck: 0, indictWarn: 0, protest: 0, protestUntil: 0, moodLowDays: 0, protestsSeen: 0, strike: 0, strikeUntil: 0, strikeCool: 0, wageMul: 1, strikesSeen: 0, schoolDemand: 0, unionDay: 0, fstrike: 0, fstrikeUntil: 0, fstrikeCool: 0, factoryWage: 1, fstrikesSeen: 0, cop: 0, copUntil: 0, copCool: 0, copWage: 1, doctrine: 0, doctrineCool: 0, lowWarn: 0, envWarn: 0, homelessWarn: 0, shooting: 0, shootingUntil: 0, shootingDead: 0, shootingsSeen: 0, river: 0, riverUntil: 0, riverCool: 0, riversSeen: 0, riversCleaned: 0, riverBuriedDay: 0, pothole: 0, potholeCool: 0, potholeTile: null, potholesSeen: 0, testifiedDay: 0, testifiedTies: 0, press: 0, pressDue: 0, hintsOn: null, soundOn: true, musicOn: true, musicSet: -1, dictator: false, scored: 0, peakApproval: 0,
     govStage: 0, govRel: 0, govPending: 0, govBacked: 0, govShield: 0, govTrade: 1,
     govAsk: 0, govAskDay: 0, govBuiltDay: 0, govTraffic: 1, churchGov: 1, churchGovUntil: 0, works: "balanced", lawyerId: null, lawyerOffer: 0, lawyerFrom: 0, deadLawyers: [],
     fedFavor: 0, lawyerLocked: 0, potus: 0, judyUntil: 0, judySeen: 0, commsId: null,
@@ -1791,10 +1873,17 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
         status[i].vandalized = true;
         return;
       }
-      jobs += b.jobs; shops.push([i, b.rev || 0, smogPenalty * crew * shopRevMul]); targets.push([r, c]); }
-    if (cell.type === "factory") { jobs += b.jobs; upkeep += indUp(b.upkeep); upIndustry += indUp(b.upkeep);
-      goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1) * highwayTrade * (flags.commsTrade || 1) * (MY.ind || 1)); if (cell.smuggle) smuggling += 1;
-      factories.push([r, c, indUp(b.upkeep)]); targets.push([r, c]); }
+      jobs += b.jobs; shops.push([i, b.rev || 0, smogPenalty * crew * shopRevMul * (flags.pandemic ? MUTATORS.pandemic.shopMul : 1)]); targets.push([r, c]); }
+    if (cell.type === "factory") {
+      const fUp = Math.round(indUp(b.upkeep) * (flags.factoryWage || 1));
+      upkeep += fUp; upIndustry += fUp;
+      // A floor on strike still costs you its payroll and produces nothing.
+      if (!flags.linesShut) {
+        jobs += b.jobs;
+        goods += Math.round((b.rev || 0) * (cell.smuggle ? 2 : 1) * crew * (flags.retrofit || 1) * highwayTrade * (flags.commsTrade || 1) * (MY.ind || 1));
+        if (cell.smuggle) smuggling += 1;
+      }
+      factories.push([r, c, fUp]); targets.push([r, c]); }
     if (cell.type === "police") { const cu = Math.round(civicCost(b.upkeep) * F.upkeep * (flags.copWage || 1));
       jobs += Math.max(1, b.jobs + F.staff + chiefStaff);
       const tsuiCap = CH && CH.tsuiStations ? CH.tsuiStations + (flags.mayor === "jenkins" && CH.name === "Leroy Jenkins" ? 1 : 0) : 0;
@@ -1824,7 +1913,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
       upkeep += cu; upCivic += cu;
       if (!flags.schoolsShut) {
         jobs += b.jobs;
-        learning += (b.learn || 1) * smogPenalty * crew * (1 - 0.3 * noiseAt(r, c)) * (flags.doctrineSchools || 1);
+        learning += (b.learn || 1) * smogPenalty * crew * (1 - 0.3 * noiseAt(r, c)) * (flags.doctrineSchools || 1) * (flags.pandemic ? MUTATORS.pandemic.learnMul : 1);
         schools.push([r, c]);
         schoolCov.push([r, c, b.reach || SCHOOL_REACH, crew]);
       }
@@ -1998,7 +2087,7 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
     const [r, c] = rc(i);
     const nbs = [at(r - 1, c), at(r + 1, c), at(r, c - 1), at(r, c + 1)].filter(isRoad);
     const raw = load[i] + nbs.reduce((a, nb) => a + load[nb], 0) / Math.max(1, nbs.length) * 0.5;
-    flow[i] = raw * (1 - relief[i]);
+    flow[i] = raw * (1 - relief[i]) * (flags.pandemic ? MUTATORS.pandemic.flowMul : 1);
   });
 
   let congested = 0, roadCount = 0, jamSum = 0;
@@ -2070,8 +2159,9 @@ function derive(grid, workforce = Infinity, taxKey = "normal", fundKey = "normal
   goods = Math.round(goods * (1 + 0.05 * bankCount));
   if (EV && EV.goods) goods = Math.round(goods * EV.goods);
   if (flags.iceOn) goods = Math.round(goods * 0.85);
+  if (flags.mutRev) goods = Math.round(goods * flags.mutRev);
   upkeep = Math.round(upkeep);
-  const revenueNet = Math.round(revenue * (1 - 0.35 * traffic) * (EV && EV.trade ? EV.trade : 1) * (flags.iceOn ? 0.85 : 1));
+  const revenueNet = Math.round(revenue * (1 - 0.35 * traffic) * (EV && EV.trade ? EV.trade : 1) * (flags.iceOn ? 0.85 : 1) * (flags.mutRev || 1));
 
   // Where the environment is heading. 100 is pristine. Industry drags it down,
   // green space pulls it back, and the doctrine you govern under colours all of
@@ -2250,7 +2340,7 @@ function step(prev) {
       commsFee: COMMS[prev.commsId] ? COMMS[prev.commsId].fee : 0, commsTrade: COMMS[prev.commsId] ? COMMS[prev.commsId].trade : 1,
       commsMood: COMMS[prev.commsId] ? COMMS[prev.commsId].mood : 0,
       chiefFee: CHIEFS[prev.chiefId] ? (CHIEFS[prev.chiefId].salary || 0) : 0, govTrade: prev.govTrade, bustArrest: prev.bust === 2, bustPardon: prev.bust === 3, chiefId: prev.chiefId, mayor: prev.mayor, day: prev.day, privPrison: prev.privPrison === 2, leaderless: !prev.chiefId && (prev.deadChiefs || []).length >= Object.keys(CHIEFS).length, speakersDown: (prev.speakerDown || 0) === 1,
-      protestTraffic: ((prev.eco === 3 || prev.eco === 5) && prev.day < (prev.ecoUntil || 0)) ? 2 : 1, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
+      protestTraffic: ((prev.eco === 3 || prev.eco === 5) && prev.day < (prev.ecoUntil || 0)) ? 2 : 1, shake: (prev.chiefShake || 0) > prev.day, faithStance: prev.faithStance, campaign: (prev.campaignUntil || 0) > prev.day, tradeBribes: (prev.bribeTrade || []).filter((d) => d > prev.day).length, upkeepMul: DP.economy.upkeep, graffiti: prev.graffiti === 1, riotOn: prev.riot === 1, iceOn: prev.ice === 2, mutRev: (prev.mutators || []).includes("recession") ? MUTATORS.recession.revMul : 0, pandemic: (prev.mutators || []).includes("pandemic"), ...protestFlags(prev), ...strikeFlags(prev), ...copFlags(prev), ...faithFlags(prev), ...riverFlags(prev), grace: earlyGrace(prev.day), env: prev.env });
   const baseHap = calcHap(prev.pop, d, prev.mafia, prev.crime);
   const hap = baseHap + (H ? H.mood : 0) + (CHF ? CHF.mood : 0) + (EV && EV.mood ? EV.mood : 0);
   let pop = prev.pop;
@@ -2269,15 +2359,18 @@ function step(prev) {
 
   let mafia = prev.mafia, calm = prev.calm, mafiaMoney = 0;
   let tsuiReturn = prev.tsuiReturn || 0;
-  if (mafia === "none" && tsuiReturn > 0 && prev.day + 1 >= tsuiReturn) { mafia = "choice"; tsuiReturn = 0; }
-  else if (mafia === "none" && tsuiReturn === 0 && Math.floor(pop) >= MAFIA_POP) mafia = "choice";
+  const mutClean = (prev.mutators || []).includes("cleanhands");
+  if (!mutClean && mafia === "none" && tsuiReturn > 0 && prev.day + 1 >= tsuiReturn) { mafia = "choice"; tsuiReturn = 0; }
+  else if (!mutClean && mafia === "none" && tsuiReturn === 0 && Math.floor(pop) >= MAFIA_POP) mafia = "choice";
   if (mafia === "allied") mafiaMoney = (prev.mayor === "jenkins" ? 20 : kickbackFor(prev.deal, prev.rigged)) + (prev.backroom ? 10 : 0);
   // What it costs to keep a favour like that quiet.
   if (prev.tsuiSilence === 2 && (prev.day + 1) < (prev.silenceUntil || 0)) mafiaMoney -= SILENCE_RATE;
 
   // Crime exists in every state. The mob just makes it much worse.
   const reprisal = prev.reprisal > 0 ? prev.reprisal - 1 : 0;
-  const crimeRows = crimeLedgerRows({ mafia, reprisal, testified: prev.testified, rigged: prev.rigged,
+  const mutPandemic = (prev.mutators || []).includes("pandemic");
+  const whHot = (prev.warehouse || -1) >= 0 && !prev.whShut && (prev.tsuiWar || 0) > 0;
+  const crimeRows = crimeLedgerRows({ whHot, pandemic: mutPandemic, mafia, reprisal, testified: prev.testified, rigged: prev.rigged,
     pop, backroom: prev.backroom, fund: prev.fund, heir: prev.heir, event: prev.event, gear: prev.gear,
     day: prev.day, bustUntil: prev.bustUntil, chiefId: prev.chiefId }, d);
   const crimeAim = crimeTargetOf(crimeRows);
@@ -2457,7 +2550,10 @@ function step(prev) {
   let strikesSeen = prev.strikesSeen || 0;
   const anySchool = prev.grid.some((c) => c && c.type === "school" && !c.build);
   if (strike >= 2 && day >= strikeCool) strike = 0;      // contract settled, tempers cooled
-  if (strike === 0 && anySchool && day > strikeCool && evRoll(71) < STRIKE_ODDS * mCalm) {
+  const hasUnion = prev.grid.some((c) => c && c.type === "union" && !c.build);
+  const factoriesUp = prev.grid.filter((c) => c && c.type === "factory" && !c.build).length;
+  const unionCalm = hasUnion ? UNION_CALM : 1;
+  if (strike === 0 && anySchool && day > strikeCool && evRoll(71) < STRIKE_ODDS * mCalm * unionCalm) {
     strike = 1;
     strikesSeen = strikesSeen + 1;
     note("🍎", "THE TEACHERS ARE OUT", "The union wants a contract. The classrooms are empty until you answer.", "bad");
@@ -2472,9 +2568,23 @@ function step(prev) {
   let copCool = prev.copCool || 0;
   const anyStation = prev.grid.some((c) => c && c.type === "police" && !c.build);
   if (cop >= 2 && day >= copCool) cop = 0;
-  if (cop === 0 && anyStation && day > copCool && evRoll(83) < COP_ODDS) {
+  if (cop === 0 && anyStation && day > copCool && evRoll(83) < COP_ODDS * unionCalm) {
     cop = 1;
     note("🚓", "THE POLICE WANT A RAISE", "Every officer signed it. Refuse and the cars stay in the lot.", "news");
+  }
+
+  // With a hall to meet in, the floor can ask for a contract of its own.
+  // Without one, nobody on the line has anywhere to organise.
+  let fstrike = prev.fstrike || 0;
+  let fstrikeUntil = prev.fstrikeUntil || 0;
+  let fstrikeCool = prev.fstrikeCool || 0;
+  let fstrikesSeen = prev.fstrikesSeen || 0;
+  if (fstrike >= 2 && day >= fstrikeCool) fstrike = 0;
+  if (fstrike === 0 && hasUnion && factoriesUp > 0 && day > fstrikeCool
+      && evRoll(91) < FSTRIKE_ODDS * mCalm) {
+    fstrike = 1;
+    fstrikesSeen = fstrikesSeen + 1;
+    note("\u270A", "THE FLOOR WANTS A CONTRACT", "The union has a list. The lines keep running until you answer it.", "bad");
   }
 
   // The pulpit wants the curriculum. Needs a church to ask from.
@@ -2592,13 +2702,15 @@ function step(prev) {
   // Two ways a crowd forms: the town is miserable, or the mayor is. Below 20
   // approval, people gather even on a fine day, and the fuse burns twice as
   // fast. Mulaney's calm still slows it, but nothing stops it.
-  const streetAngry = baseHap < PROTEST_MOOD || (prev.approval || 0) < 20;
+  const streetAngry = baseHap < PROTEST_MOOD || (prev.approval || 0) < 20 || mutPandemic;
   moodLowDays = streetAngry ? moodLowDays + mCalm * ((prev.approval || 0) < 20 ? 2 : 1) : 0;
   // Nobody marches against Quietmilk. If he already runs the department, the
-  // grievance has no target and the crowd never forms.
-  if (prev.chiefId === "quietmilk") moodLowDays = 0;
+  // grievance has no target and the crowd never forms. A plague is the one
+  // thing he cannot community-outreach his way out of: the crowd is not there
+  // about the police, so a gentle chief buys nothing.
+  if (prev.chiefId === "quietmilk" && !mutPandemic) moodLowDays = 0;
   if (protest === 0 && moodLowDays >= PROTEST_DAYS && day > CRIME_GRACE
-      && prev.chiefId !== "quietmilk") {
+      && (prev.chiefId !== "quietmilk" || mutPandemic)) {
     protest = 1;
     protestsSeen = protestsSeen + 1;
     note("✊", "LUCKHEAD IS PROTESTING", "A crowd on the City Hall steps, chanting about harsh policing.", "news");
@@ -2616,6 +2728,7 @@ function step(prev) {
   // because a thin police department is worth more to him than the money is.
   if (tsuiLoan === 0 && day > CRIME_GRACE && day > tsuiLoanCool
       && prev.mafia !== "defeated" && !prev.testified
+      && !(prev.mutators || []).includes("cleanhands")
       && (prev.money < TSUI_LOAN_TRIGGER
           || (prev.mafia === "allied" && evRoll(199) < TSUI_LOAN_ODDS))) tsuiLoan = 1;
 
@@ -2871,7 +2984,7 @@ function step(prev) {
     event = pick.id;
     eventEnds = day + pick.days;
     eventSeen = eventSeen + 1;
-    nextEvent = day + EVENT_EVERY;
+    nextEvent = day + Math.round(EVENT_EVERY * ((prev.mutators || []).includes("crowded") ? MUTATORS.crowded.eventMul : 1));
     note(pick.icon, pick.name.toUpperCase(), pick.tag, pick.good ? "good" : "bad");
   }
 
@@ -2882,6 +2995,17 @@ function step(prev) {
   // Police chief shows up the first time crime maxes out.
   let chief = prev.chief || 0;
   if (crime >= 100 && chief === 0 && !prev.gear && day > 50) chief = 1;
+
+  // A station within reach of the warehouse, during a feud, is an opportunity
+  // somebody in the department will eventually raise.
+  let raid = prev.raid || 0;
+  if (raid === 0 && (prev.warehouse || -1) >= 0 && !prev.whShut && (prev.tsuiWar || 0) > 0
+      && !prev.dictator && day > (prev.raidCool || 0)) {
+    const wr = Math.floor(prev.warehouse / SIZE), wc = prev.warehouse % SIZE;
+    const covered = prev.grid.some((c, i) => c && c.type === "police" && !c.build
+      && Math.abs(Math.floor(i / SIZE) - wr) + Math.abs((i % SIZE) - wc) <= RAID_REACH);
+    if (covered) raid = 1;
+  }
 
   // The moment you break with the family: freeze immigration, tear up every
   // arrangement, and put a clock on the chief's life.
@@ -2952,7 +3076,10 @@ function step(prev) {
   const metTsui = mafia === "refused" || mafia === "defeated"
     || tsuiWar > 0 || (prev.tsuiReturn || 0) > 0 || (prev.heirCount || 0) > 0;
   const atOddsWithTsui = metTsui
-    && mafia !== "allied" && mafia !== "choice" && mafia !== "renegotiate";
+    && mafia !== "allied" && mafia !== "choice" && mafia !== "renegotiate"
+    // A truce is a truce. While they are away and expected back, the matches
+    // stay in the box.
+    && !(mafia === "none" && (prev.tsuiReturn || 0) > day);
   const sinceWar = tsuiWar > 0 ? day - tsuiWar : -1;
   // Turning Vincent down is not the same as taking his money and then turning
   // on him. A mayor who never came to terms gets one fire and that is the end
@@ -3071,6 +3198,10 @@ function step(prev) {
   let graffitiUntil = prev.graffitiUntil || 0, graffitiSeen = prev.graffitiSeen || 0;
   const billboardCount = prev.grid.filter((c) => c && c.type === "billboard" && !c.build).length;
   if (billboardCount >= 2 && billboardDay === 0) billboardDay = day;
+
+  // Two factories make a working class. Organising it takes a few more weeks.
+  let unionDay = prev.unionDay || 0;
+  if (factoriesUp >= UNION_FACTORIES && unionDay === 0) unionDay = day;
   if (graffiti === 0 && billboardDay > 0 && day >= billboardDay + 15 && graffitiSeen === 0) {
     graffiti = 1; graffitiUntil = day + 60; graffitiSeen = 1;
     note("🖍️", "BILLBOARDS DEFACED", "Local teens covered them in something obscene. They are down for 60 days.", "bad");
@@ -3121,6 +3252,7 @@ function step(prev) {
   }
   let polled = prev.polled, challenger = prev.challenger;
   let campaignResponded = prev.campaignResponded || false;
+  let debate = prev.debate || 0;
   if (!prev.dictator && untilVote <= WARN_DAY && polled <= cycle) {
     polled = cycle + 1;
     challenger = makeChallenger(prev.seed, cycle,
@@ -3128,6 +3260,7 @@ function step(prev) {
         stolenVotes: prev.stolenVotes, deadChiefs: prev.deadChiefs, deadLawyers: prev.deadLawyers,
         golfAsk: prev.golfAsk, eco: prev.eco, ecoUntil: prev.ecoUntil, grid: prev.grid }));
     campaignResponded = false;   // a new opponent, a clean slate to respond to
+    debate = 0;                    // and a debate still to come
   }
   // A week from a vote he is going to lose, Vincent offers to fix it.
   let tsuiSilence = prev.tsuiSilence || 0;
@@ -3136,6 +3269,9 @@ function step(prev) {
   if (tsuiSilence === 0 && !silenceSeen && !prev.dictator && challenger
       && prev.mafia === "allied" && !prev.testified
       && untilVote === SILENCE_DAY && Math.round(prev.approval) < 51) { tsuiSilence = 1; silenceSeen = 1; }
+
+  // The moderator taps the mic, once per opponent.
+  if (debate === 0 && !prev.dictator && challenger && untilVote === DEBATE_DAY && day > CRIME_GRACE) debate = 1;
 
   let over = prev.over, elected = prev.elected, succession = prev.succession || 0;
   let musicSet = prev.musicSet === undefined ? 0 : prev.musicSet;
@@ -3167,7 +3303,7 @@ function step(prev) {
           ? `${challenger ? challenger.name : "Your opponent"} withdrew. You are returned unopposed.`
           : `${youPct}% of the vote against ${challenger ? challenger.name : "the field"}.`, won ? "good" : "bad");
       if (won) { elected += 1; if (elected % SUCCESSION_EVERY === 0) succession = 1; challenger = null; campaign = 0;
-        campaignResponded = false; runoff = 0;
+        campaignResponded = false; runoff = 0; debate = 0;
         musicSet = pickMusicSet(prev.musicSet); }
       else over = true;
     }
@@ -3224,7 +3360,7 @@ function step(prev) {
   const money = prev.money + net;
   if (money <= DEBT_FLOOR) { over = true; broke = true; }
   const log = newEntries.length ? [...(prev.log || []), ...newEntries].slice(-LOG_KEEP) : (prev.log || []);
-  return { ...prev, musicSet, stolenVotes, privPrison, campaignResponded, termShift: termShiftOut, runoff, runoffCount, tsuiSilence, silenceSeen, oppOut, govCircleCool: prev.govCircleCool || 0, fedCircleCool: prev.fedCircleCool || 0,
+  return { ...prev, musicSet, stolenVotes, privPrison, campaignResponded, raid, unionDay, fstrike, fstrikeUntil, fstrikeCool, fstrikesSeen, termShift: termShiftOut, runoff, runoffCount, tsuiSilence, silenceSeen, oppOut, debate, govCircleCool: prev.govCircleCool || 0, fedCircleCool: prev.fedCircleCool || 0,
     // He remembers who helped, and who did not, for the rest of the game.
     fedFavor: stolenVotes === 2 ? 3 : stolenVotes === 3 ? FED_FAVOR_MIN : prev.fedFavor,
     surv, survCool, survOutcryUntil, rallyMood, rallyUntil, golfAsk, golfUntil, statueOffer, eco, ecoUntil, ecoCool, speakerDown, speakerUntil, speakerCool, tsuiLoan, tsuiLoanUntil, tsuiLoanCool, tsuiHush, staffOffer, potus, judyUntil, judySeen,
@@ -3636,7 +3772,7 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
     for (const i of tiles) {
       const ratio = cap[i] ? flow[i] / cap[i] : 0;
       if (ratio <= SMOG_RATIO) continue;
-      smoke.push({ i, w: Math.min(1.1, (ratio - SMOG_RATIO) * 1.5), col: "rgba(150, 146, 118, ",
+      smoke.push({ i, w: Math.min(0.6, (ratio - SMOG_RATIO) * 0.9), col: "rgba(150, 146, 118, ",
         lift: 0.22, rise: 1.9, spread: 1.5 });
     }
     if (fire >= 0) smoke.push({ i: fire, w: 4.2, col: "rgba(112, 104, 88, " });
@@ -4248,7 +4384,7 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
           // bunch on exactly the tiles the traffic number is blaming. A
           // civilian with an officer closing on them stops walking.
           const ratio = W.cap[w.from] ? W.flow[w.from] / W.cap[w.from] : 0;
-          const speed = (w.held ? 0.15 : 1) * 1.1 / (1 + Math.max(0, ratio - 0.55) * 1.9);
+          const speed = (w.held ? 0.15 : 1) * 1.0 / (1 + Math.max(0, ratio - 0.55) * 1.9);
           w.t += dt * speed;
           while (w.t >= 1) {
             w.t -= 1;
@@ -4283,11 +4419,96 @@ function WalkerLayer({ grid, status, roadCap, paused, fund, chiefId, day, copsOu
   return <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }} />;
 }
 
+// ---- the debate ----
+// Up to three lines of questioning, ranked the same way a challenger's daily
+// attack is picked, so round one always matches whatever is already landing.
+// Each round resolves the moment you pick it. Nothing reaches the real game
+// state until LEAVE THE STAGE: the whole thing is local until it is over.
+function DebateModal({ topics, smooth, onFinish, onSkip }) {
+  const disp = { fontFamily: "'Staatliches', 'Arial Narrow', sans-serif", letterSpacing: "0.08em" };
+  const mono = { fontFamily: "ui-monospace, Menlo, monospace" };
+  const [picks, setPicks] = useState({});
+  const done = topics.every((t) => picks[t.key]);
+  const total = Object.values(picks).reduce((a, p) => a + p.delta, 0);
+
+  const answer = (key, choice) => {
+    if (picks[key]) return;
+    const win = Math.random() < (smooth || (choice === "own" ? DEBATE_OWN_ODDS : DEBATE_FIGHT_ODDS));
+    const delta = choice === "own" ? (win ? DEBATE_OWN_PTS : -DEBATE_OWN_PTS)
+      : (win ? DEBATE_FIGHT_WIN : DEBATE_FIGHT_LOSE);
+    const line = choice === "own"
+      ? (win ? "The straight answer holds." : "Nobody is moved.")
+      : (win ? "The room is with you." : "It does not land.");
+    setPicks((p) => ({ ...p, [key]: { choice, delta, line } }));
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 65, padding: 12 }}>
+      <div style={{ width: "min(90vw, 380px)", maxHeight: "88vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.orange}`, borderRadius: 16, padding: 18 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+          <div>
+            <div style={{ ...mono, fontSize: 10, color: C.orange, letterSpacing: "0.2em", marginBottom: 3 }}>SIXTEEN DAYS TO THE VOTE</div>
+            <div style={{ ...disp, fontSize: 19 }}>THE DEBATE</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ ...mono, fontSize: 9.5, color: C.dim }}>NET</div>
+            <div style={{ ...disp, fontSize: 18, color: total > 0 ? C.green : total < 0 ? C.red : C.cream }}>
+              {total > 0 ? "+" : ""}{total}
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 12.5, lineHeight: 1.5, color: C.dim, margin: "8px 0 12px" }}>
+          The moderator opens the floor. Nothing you say tonight is safe. Answer straight and it moves the room a little, one way or the other, or swing for something bigger and risk more on the same coin.
+          {smooth ? " Mulaney has done a thousand rooms like this one. The coin bends his way." : ""}
+        </div>
+        {topics.map((t) => {
+          const p = picks[t.key];
+          return (
+            <div key={t.key} style={{ marginBottom: 9, padding: "10px 12px", borderRadius: 11, border: `1px solid ${C.line}` }}>
+              <div style={{ ...disp, fontSize: 13.5, color: C.cream, marginBottom: p ? 4 : 8 }}>{t.label}</div>
+              {p ? (
+                <div style={{ ...mono, fontSize: 10.5, color: p.delta >= 0 ? C.green : C.red }}>
+                  {p.line} {p.delta >= 0 ? "+" : ""}{p.delta}
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 7 }}>
+                  <span onClick={() => answer(t.key, "own")}
+                    style={{ flex: 1, cursor: "pointer", textAlign: "center", padding: "7px 6px", borderRadius: 9, border: `1px solid ${C.line}` }}>
+                    <div style={{ ...disp, fontSize: 11.5, color: C.cream }}>OWN IT</div>
+                    <div style={{ ...mono, fontSize: 9, color: C.dim, marginTop: 1 }}>{smooth ? "7 in 10" : "even odds"}, +{DEBATE_OWN_PTS} or -{DEBATE_OWN_PTS}</div>
+                  </span>
+                  <span onClick={() => answer(t.key, "fight")}
+                    style={{ flex: 1, cursor: "pointer", textAlign: "center", padding: "7px 6px", borderRadius: 9, border: `1px solid ${C.amber}` }}>
+                    <div style={{ ...disp, fontSize: 11.5, color: C.amber }}>FIGHT BACK</div>
+                    <div style={{ ...mono, fontSize: 9, color: C.dim, marginTop: 1 }}>{smooth ? "7 in 10" : "even odds"}, +{DEBATE_FIGHT_WIN} or {DEBATE_FIGHT_LOSE}</div>
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          <span onClick={onSkip} style={{ ...mono, fontSize: 10.5, color: C.dim, cursor: "pointer", padding: "9px 4px" }}>
+            SKIP THE DEBATE
+          </span>
+          <span style={{ flex: 1 }} />
+          <span onClick={() => done && onFinish(total)}
+            style={{ ...disp, fontSize: 13, cursor: done ? "pointer" : "default", padding: "9px 15px", borderRadius: 10,
+                     background: done ? C.amber : C.line, color: done ? C.ink : C.dim }}>
+            LEAVE THE STAGE
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Luckhead() {
   const [st, setSt] = useState(freshState);
   const [booted, setBooted] = useState(false);
   const [needsDiff, setNeedsDiff] = useState(false);
   const [pickDiff, setPickDiff] = useState(DEFAULT_DIFF);
+  const [pickMuts, setPickMuts] = useState([]);
     const [pickMayor, setPickMayor] = useState("mulaney");
   const [pickHints, setPickHints] = useState(true);
   const [pickDictator, setPickDictator] = useState(false);
@@ -4404,7 +4625,7 @@ export default function Luckhead() {
       commsFee: COMMS[st.commsId] ? COMMS[st.commsId].fee : 0, commsTrade: COMMS[st.commsId] ? COMMS[st.commsId].trade : 1,
       commsMood: COMMS[st.commsId] ? COMMS[st.commsId].mood : 0,
       chiefFee: CHIEFS[st.chiefId] ? (CHIEFS[st.chiefId].salary || 0) : 0, govTrade: st.govTrade, bustArrest: st.bust === 2, bustPardon: st.bust === 3, chiefId: st.chiefId, mayor: st.mayor, day: st.day, privPrison: st.privPrison === 2, leaderless: !st.chiefId && (st.deadChiefs || []).length >= Object.keys(CHIEFS).length, speakersDown: (st.speakerDown || 0) === 1,
-      protestTraffic: ((st.eco === 3 || st.eco === 5) && st.day < (st.ecoUntil || 0)) ? 2 : 1, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
+      protestTraffic: ((st.eco === 3 || st.eco === 5) && st.day < (st.ecoUntil || 0)) ? 2 : 1, shake: (st.chiefShake || 0) > st.day, faithStance: st.faithStance, campaign: (st.campaignUntil || 0) > st.day, tradeBribes: (st.bribeTrade || []).filter((d) => d > st.day).length, upkeepMul: diffOf(st.diff).economy.upkeep, graffiti: st.graffiti === 1, riotOn: st.riot === 1, iceOn: st.ice === 2, mutRev: (st.mutators || []).includes("recession") ? MUTATORS.recession.revMul : 0, pandemic: (st.mutators || []).includes("pandemic"), ...protestFlags(st), ...strikeFlags(st), ...copFlags(st), ...faithFlags(st), ...riverFlags(st), grace: earlyGrace(st.day), env: st.env }), [st.grid, st.pop, st.tax, st.fund, st.terrain, st.heir, st.event, st.bust, st.chiefId, st.chiefShake, st.day, st.faithStance, st.bribeTrade, st.campaignUntil, st.diff, st.graffiti, st.riot, st.ice, st.protest, st.strike, st.strikeUntil, st.wageMul, st.cop, st.copUntil, st.copWage, st.doctrine, st.faithStance, st.river, st.riverUntil, st.riversCleaned, st.env]);
   const hap = calcHap(st.pop, d, st.mafia, st.crime);
   const fp = Math.floor(st.pop);
   const employed = Math.min(fp, d.jobs);
@@ -4588,6 +4809,8 @@ export default function Luckhead() {
   const showPriv = st.privPrison === 1 && !st.over;
   const showRunoff = st.runoff === 1 && !st.over;
   const showSilence = st.tsuiSilence === 1 && !st.over;
+  const showDebate = st.debate === 1 && !st.over;
+  const showRaid = st.raid === 1 && !st.over;
   const showRally = st.rally === 1 && !st.over;
   const showSlander = st.slander === 1 && !st.over;
   const showEco = st.eco === 1 && !st.over;
@@ -4595,6 +4818,7 @@ export default function Luckhead() {
   const showIndict = st.indictWarn === 1 && st.fed === 1 && !st.over;
   const showProtest = st.protest === 1 && !st.over;
   const showStrike = st.strike === 1 && !st.over;
+  const showFStrike = st.fstrike === 1 && !st.over;
   const showRiver = st.river === 1 && !st.over;
   const showSpeech = st.speech === 1 && !st.over;
   const showInvest = st.invest === 1 && !st.over;
@@ -4613,9 +4837,9 @@ export default function Luckhead() {
   // One interruption at a time, and never two within MODAL_GAP days. Anything
   // held back keeps its flag and simply waits its turn.
   const pendingModals = [
-    ["heir", showHeir], ["vote", showVote], ["fed", showFed], ["indict", showIndict], ["protest", showProtest], ["arson", showArson], ["viral", showViral], ["speech", showSpeech], ["invest", showInvest], ["river", showRiver], ["strike", showStrike], ["cop", showCop], ["doctrine", showDoctrine], ["chief", showChief],
+    ["heir", showHeir], ["vote", showVote], ["fed", showFed], ["indict", showIndict], ["protest", showProtest], ["arson", showArson], ["viral", showViral], ["speech", showSpeech], ["invest", showInvest], ["river", showRiver], ["strike", showStrike], ["fstrike", showFStrike], ["cop", showCop], ["doctrine", showDoctrine], ["chief", showChief],
     ["ice", showIce], ["blackmail", showBlackmail],
-    ["potus", showPotus], ["votes", showVotes], ["runoff", showRunoff], ["silence", showSilence], ["priv", showPriv], ["eco", showEco], ["surv", showSurv], ["golf", showGolf], ["rally", showRally], ["slander", showSlander], ["marla", showMarla], ["feud", showFeud], ["audit", showAudit], ["hush", showHush], ["staff", showStaff], ["govask", showGovAsk], ["gov", showGov], ["tsuiloan", showTsuiLoan], ["loan", showLoan], ["pvisit", showPvisit], ["bust", showBust],
+    ["potus", showPotus], ["votes", showVotes], ["runoff", showRunoff], ["silence", showSilence], ["raid", showRaid], ["debate", showDebate], ["priv", showPriv], ["eco", showEco], ["surv", showSurv], ["golf", showGolf], ["rally", showRally], ["slander", showSlander], ["marla", showMarla], ["feud", showFeud], ["audit", showAudit], ["hush", showHush], ["staff", showStaff], ["govask", showGovAsk], ["gov", showGov], ["tsuiloan", showTsuiLoan], ["loan", showLoan], ["pvisit", showPvisit], ["bust", showBust],
     ["smuggle", showSmuggle], ["venue", showVenue], ["faith", showFaith],
     ["campaign", showCampaign], ["event", showEvent],
   ].filter(([, on]) => on).map(([k]) => k);
@@ -4664,7 +4888,8 @@ export default function Luckhead() {
     const d = st.diff || DEFAULT_DIFF;
     const entry = {
       total: L.total, title: L.title, days: st.day,
-      diff: `${DIFFICULTY.economy[d.economy].label[0]}/${DIFFICULTY.politics[d.politics].label[0]}/${DIFFICULTY.crime[d.crime].label[0]}`,
+      diff: `${DIFFICULTY.economy[d.economy].label[0]}/${DIFFICULTY.politics[d.politics].label[0]}/${DIFFICULTY.crime[d.crime].label[0]}`
+        + ((st.mutators || []).length ? " " + st.mutators.map((id) => (MUTATORS[id] || {}).icon || "").join("") : ""),
       when: Date.now(),
     };
     recordHiscore(entry).then(({ list, rank }) => { setHiscores(list); setHiRank(rank); });
@@ -4737,11 +4962,16 @@ export default function Luckhead() {
     // Keep whatever theme is already playing; a new game should not interrupt
     // the song the title screen started on. Only a re-election changes it.
     const keepSet = st.musicSet;
+    const muts = pickMayor === "jenkins" ? pickMuts.filter((m) => m !== "cleanhands") : pickMuts;
     const next = { ...freshState(seed, diff || pickDiff), hintsOn: pickHints, musicSet: keepSet, dictator: pickDictator,
-        mayor: pickMayor,
+        mayor: pickMayor, mutators: muts,
         ...(pickMayor === "jenkins" ? { mafia: "allied", everAllied: 1 } : {}),
         ...(pickMayor === "mulaney" ? { govRel: 1 } : {}),
         ...(pickMayor === "debbs" ? { tax: "high", fedFavor: -1 } : {}) };
+    if (muts.includes("pariah")) {
+      next.govRel = (next.govRel || 0) - 1;
+      next.fedFavor = Math.max(FED_FAVOR_MIN, (next.fedFavor || 0) - 1);
+    }
     lastSave.current = Date.now();
     saveGame(next);
     setSt(next);
@@ -4905,6 +5135,16 @@ export default function Luckhead() {
     }
     if (tool === null) {
       const g = (st.terrain || [])[i] || PLAIN;
+      if (st.warehouse === i) {
+        setNote(st.whShut
+          ? "The Tsui warehouse, shuttered. Whatever ran through here runs somewhere else now."
+          : (st.tsuiWar || 0) > 0
+          ? `The Tsui warehouse. With the family at war with you it is worth 8 crime a day, and a Police Station within ${RAID_REACH} tiles would let you do something about it.`
+          : st.mafia === "allied"
+          ? `The Tsui warehouse. Factories within ${WAREHOUSE_REACH} tiles can run the family's goods.`
+          : `The Tsui warehouse. The family has owned this building longer than you have held office. Nothing moves through it yet.`);
+        return;
+      }
       if (st.interstate === i && !cell) {
         setNote(d.highwayOn
           ? `Interstate access, open. Shops and factories earn ${Math.round((HIGHWAY_TRADE - 1) * 100)}% more, and the through traffic costs you ${HIGHWAY_CRIME} crime, dirtier air, and busier roads. Tear up the connecting road to close it.`
@@ -4949,6 +5189,7 @@ export default function Luckhead() {
       setNote(`Demolished. Salvage: $${refund}.`);
       return;
     }
+    if (st.warehouse === i && tool) { setNote("The family owns this ground. It is not yours to build on."); return; }
     if ((st.terrain || [])[i] === WATER && tool && tool !== "doze" && tool !== "up" && tool !== "bridge") { setNote("Only a Bridge can cross water."); return; }
     if (tool === "line" && cell && (cell.type === "road" || cell.type === "bridge")) {
       if (cell.wire) { setNote("Already wired."); return; }
@@ -5184,6 +5425,22 @@ export default function Luckhead() {
                   ].filter(Boolean).join(", "),
                   pointerEvents: "none", zIndex: 5 }} />
               )}
+            </>
+          );
+        })()}
+        {st.warehouse === i && (() => {
+          const hot = !st.whShut && (st.tsuiWar || 0) > 0;
+          const live = !st.whShut && st.mafia === "allied";
+          const tint = st.whShut ? C.dim : hot ? C.red : live ? C.amber : C.dash;
+          return (
+            <>
+              <span style={{ position: "absolute", inset: 0, borderRadius: 4,
+                boxShadow: `inset 0 0 0 2px ${tint}`,
+                background: st.whShut ? "rgba(0,0,0,0.28)" : hot ? "rgba(193,58,45,0.20)" : live ? "rgba(242,193,49,0.16)" : "rgba(216,207,174,0.10)",
+                pointerEvents: "none", zIndex: 3 }} />
+              <span style={{ fontSize: "clamp(8px, 2.8vw, 12px)", opacity: st.whShut ? 0.4 : 1, zIndex: 4 }}>
+                {"\uD83C\uDFEC"}
+              </span>
             </>
           );
         })()}
@@ -5475,6 +5732,40 @@ export default function Luckhead() {
           </div>
 
           )}
+          <div style={{ marginTop: 4, marginBottom: 16 }}>
+            <div style={{ ...disp, fontSize: 13, color: C.cream, letterSpacing: "0.1em", marginBottom: 2 }}>TWISTS</div>
+            <div style={{ ...mono, fontSize: 9.5, color: C.dim, marginBottom: 8 }}>
+              Optional. Each makes the run harder and pays it back in score. Pick up to {MUT_MAX}.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+              {MUT_KEYS.map((id) => {
+                const M = MUTATORS[id];
+                const on = pickMuts.includes(id);
+                const blocked = id === "cleanhands" && pickMayor === "jenkins";
+                const full = !on && pickMuts.length >= MUT_MAX;
+                return (
+                  <div key={id}
+                    onClick={() => {
+                      if (blocked) return;
+                      if (on) setPickMuts((p) => p.filter((x) => x !== id));
+                      else if (!full) setPickMuts((p) => [...p, id]);
+                    }}
+                    style={{ padding: "8px 10px", borderRadius: 10, cursor: blocked || full ? "default" : "pointer",
+                             opacity: blocked ? 0.35 : full ? 0.55 : 1,
+                             background: on ? C.bg : "transparent",
+                             border: `1px solid ${on ? C.amber : C.line}` }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                      <span style={{ fontSize: 12 }}>{M.icon}</span>
+                      <span style={{ ...disp, fontSize: 11, color: on ? C.amber : C.cream }}>{M.name}</span>
+                    </div>
+                    <div style={{ ...mono, fontSize: 8.5, color: C.dim, marginTop: 3, lineHeight: 1.4 }}>
+                      {blocked ? "A Jenkins arrives already in business with the family." : M.blurb}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           <div onClick={() => doReset(undefined, pickDiff)}
             style={{ ...disp, fontSize: 18, textAlign: "center", background: C.orange, color: C.ink, borderRadius: 12, padding: "12px 0", cursor: "pointer", letterSpacing: "0.08em" }}>
             TAKE OFFICE
@@ -5953,6 +6244,7 @@ export default function Luckhead() {
       {/* palette */}
       <div style={{ width: boardW, marginTop: 8, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
         {BUILD_KEYS.filter((k) => (k !== "mansion" || (st.govAsk || 0) >= 2)
+          && (k !== "union" || ((st.unionDay || 0) > 0 && st.day >= (st.unionDay || 0) + UNION_WAIT))
           && (!MILESTONE_POP[k] || (fp >= MILESTONE_POP[k] && crossedMilestone(k))) && (!UNLOCK_DAY[k] || st.day >= UNLOCK_DAY[k]) && (!UNLOCK_AFTER[k] || st.grid.some((c) => c && c.type === UNLOCK_AFTER[k])) && !(SPECIALTY.has(k) && st.grid.some((c) => c && c.type === k))
               && !(BUILD_CAP[k] && st.grid.filter((c) => c && c.type === k).length >= BUILD_CAP[k])).map((k) => (
           <PaletteBtn
@@ -6060,7 +6352,7 @@ export default function Luckhead() {
         const riggedAlready = st.rigged;
         // Rigging is a favour the family does for a friend. A mayor at war with
         // them has nobody left in town who will touch the count.
-        const canRig = st.mafia === "allied" || st.mafia === "defeated";
+        const canRig = (st.mafia === "allied" || st.mafia === "defeated") && !(st.mutators || []).includes("cleanhands");
         const respondCost = Math.round(150 + 3 * st.pop);
         const canRespond = !!st.challenger && pollAtk.drag > 0;
         const canAffordRespond = st.money >= respondCost;
@@ -6210,6 +6502,11 @@ export default function Luckhead() {
                   {L.mult !== 1 && (
                     <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0", color: L.mult > 1 ? C.green : C.amber }}>
                       <span>Difficulty ({DIFFICULTY.economy[(st.diff || DEFAULT_DIFF).economy].label[0]}/{DIFFICULTY.politics[(st.diff || DEFAULT_DIFF).politics].label[0]}/{DIFFICULTY.crime[(st.diff || DEFAULT_DIFF).crime].label[0]})</span><span>{L.base} × {L.mult.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {L.mutMult > 1 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10.5, padding: "2px 0", color: C.green }}>
+                      <span>Twists ({L.muts.map((id) => (MUTATORS[id] || {}).icon).join(" ")})</span><span>\u00d7 {L.mutMult.toFixed(2)}</span>
                     </div>
                   )}
                   <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -6802,7 +7099,8 @@ export default function Luckhead() {
 
       {/* image campaign */}
       {show("campaign") && (() => {
-        const left = TERM_DAYS - ((st.day - 1) % TERM_DAYS) - 1;
+        const shiftCamp = st.termShift || 0;
+        const left = TERM_DAYS - (((st.day - 1 - shiftCamp) % TERM_DAYS) + TERM_DAYS) % TERM_DAYS - 1;
         return (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 63 }}>
             <div style={{ width: "min(88vw, 352px)", background: C.panel, border: `1px solid ${C.orange}`, borderRadius: 16, padding: 18 }}>
@@ -6963,7 +7261,8 @@ export default function Luckhead() {
 
       {/* the town in the street */}
       {show("protest") && (() => {
-        const untilVote = TERM_DAYS - ((st.day - 1) % TERM_DAYS) - 1;
+        const shiftProt = st.termShift || 0;
+        const untilVote = TERM_DAYS - (((st.day - 1 - shiftProt) % TERM_DAYS) + TERM_DAYS) % TERM_DAYS - 1;
         const endsOn = st.day + untilVote;
         const decide = (stance) => (extra) => setSt((s) => ({ ...s, protest: stance, protestUntil: endsOn, ...extra }));
         return (
@@ -7051,6 +7350,44 @@ export default function Luckhead() {
                   style={{ ...disp, textAlign: "center", cursor: "pointer", fontSize: 13, color: C.red, border: `1px solid ${C.red}`, borderRadius: 9, padding: "8px 12px" }}
                 >
                   WAIT THEM OUT
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {show("fstrike") && (() => {
+        const fCount = st.grid.filter((c) => c && c.type === "factory" && !c.build).length;
+        const nowUp = Math.round(BUILD.factory.upkeep * (st.factoryWage || 1));
+        const thenUp = Math.round(BUILD.factory.upkeep * (st.factoryWage || 1) * FSTRIKE_RAISE);
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 63, padding: 12 }}>
+            <div style={{ width: "min(90vw, 372px)", maxHeight: "88vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.amber}`, borderRadius: 16, padding: 18 }}>
+              <div style={{ ...mono, fontSize: 10, color: C.amber, letterSpacing: "0.2em", marginBottom: 3 }}>A LIST OF DEMANDS, TYPED</div>
+              <div style={{ ...disp, fontSize: 20, marginBottom: 8 }}>THE FLOOR WANTS A CONTRACT</div>
+              <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
+                <p style={{ margin: "0 0 8px" }}>The hall you let them build has been busy. {fCount === 1 ? "Your factory" : `All ${fCount} of your factories`} sent the same list, and the lines are still running while you read it.</p>
+                <p style={{ margin: 0 }}>Nobody has walked out yet. That is the part you get to decide.</p>
+              </div>
+              <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 10, lineHeight: 1.7 }}>
+                <span style={{ color: C.green }}>MEET THE TERMS</span> · the lines keep running<br />
+                <span style={{ ...mono, color: C.dim }}>· upkeep per factory ${nowUp} &rarr; ${thenUp}, permanently</span><br />
+                <span style={{ color: C.red }}>REFUSE</span> · costs you nothing today<br />
+                <span style={{ ...mono, color: C.dim }}>· lines idle {FSTRIKE_SHUT} days: no goods, no jobs, and the payroll still runs</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 14 }}>
+                <span
+                  onClick={() => { setSt((x) => ({ ...x, fstrike: 2, fstrikeCool: x.day + FSTRIKE_COOL, factoryWage: (x.factoryWage || 1) * FSTRIKE_RAISE })); setToast("\u270A Signed. The lines never stopped, and the payroll never comes back down."); setSpeed("play"); }}
+                  style={{ ...disp, textAlign: "center", cursor: "pointer", fontSize: 13, background: C.green, color: C.ink, borderRadius: 9, padding: "8px 12px" }}
+                >
+                  MEET THE TERMS
+                </span>
+                <span
+                  onClick={() => { setSt((x) => ({ ...x, fstrike: 3, fstrikeUntil: x.day + FSTRIKE_SHUT, fstrikeCool: x.day + FSTRIKE_COOL })); setToast(`\uD83C\uDFED The lines stopped at noon. Nothing ships for ${FSTRIKE_SHUT} days.`); setSpeed("play"); }}
+                  style={{ ...disp, textAlign: "center", cursor: "pointer", fontSize: 13, color: C.red, border: `1px solid ${C.red}`, borderRadius: 9, padding: "8px 12px" }}
+                >
+                  REFUSE
                 </span>
               </div>
             </div>
@@ -7431,6 +7768,74 @@ export default function Luckhead() {
           </div>
         </div>
       )}
+
+      {/* the warehouse raid */}
+      {show("raid") && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 65, padding: 16 }}>
+          <div style={{ width: "min(88vw, 358px)", background: C.panel, border: `1px solid ${C.red}`, borderRadius: 16, padding: 18 }}>
+            <div style={{ ...mono, fontSize: 10, color: C.red, letterSpacing: "0.2em", marginBottom: 3 }}>FROM THE DEPARTMENT</div>
+            <div style={{ ...disp, fontSize: 17, marginBottom: 10 }}>A WARRANT FOR THE WAREHOUSE</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
+              {(st.raidsFailed || 0) > 0
+                ? "The department wants to go back. They have had time to think about what went wrong last time, and they would like you to believe they have learned from it."
+                : "You have a station close enough to move on the family's warehouse, and a feud that gives you the excuse. Your people say they can be through the door before anyone inside reaches a phone. They have said that before."}
+              {st.chiefId === "jenkins" ? " Half the department drinks with the people you would be raiding." : ""}
+            </div>
+            <div style={{ ...mono, fontSize: 10, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+              <span style={{ color: C.red }}>SERVE IT</span> · {Math.round(raidOdds(st) * 100)} in 100 the warehouse is shuttered for good, crime falls hard, and the feud is over<br />
+              <span style={{ color: C.dim }}>If it goes badly</span> · {RAID_TOLL_MIN} to {RAID_TOLL_MAX} officers killed, the town grieves for {RAID_SHOCK} days, reprisals begin, and nobody will try again for {RAID_COOL}<br />
+              <span style={{ color: C.green }}>HOLD OFF</span> · the warrant keeps
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <span style={{ flex: 1 }} />
+              <span onClick={() => {
+                     const worked = Math.random() < raidOdds(st);
+                     const toll = RAID_TOLL_MIN + Math.floor(Math.random() * (RAID_TOLL_MAX - RAID_TOLL_MIN + 1));
+                     setSt((s) => {
+                       if (worked) return { ...s, raid: 2, whShut: 1,
+                         crime: Math.max(0, s.crime - RAID_CRIME_DROP),
+                         // Losing the warehouse ends it. They go quiet, and the
+                         // city is nobody's partner and nobody's enemy again.
+                         mafia: "none", tsuiWar: 0, reprisal: 0, calm: 0, justBroke: false,
+                         tsuiReturn: s.day + TSUI_TRUCE,
+                         modalGap: s.day + MODAL_GAP };
+                       const lost = Math.min(Math.floor(s.pop), toll);
+                       return { ...s, raid: 0, raidCool: s.day + RAID_COOL, raidUntil: s.day + RAID_SHOCK,
+                                raidsFailed: (s.raidsFailed || 0) + 1,
+                                pop: Math.max(0, s.pop - lost),
+                                reprisal: 30, crime: Math.min(100, s.crime + 8), modalGap: s.day + MODAL_GAP };
+                     });
+                     setToast(worked
+                       ? "\uD83D\uDE94 The doors came off. Vincent has nothing left in this town to fight you over."
+                       : `\uD83D\uDD6F\uFE0F They were waiting in the dark. ${toll} officers did not come home.`);
+                     setSpeed("play"); }}
+                style={{ ...disp, fontSize: 13, cursor: "pointer", padding: "9px 13px", borderRadius: 10, background: C.red, color: C.cream }}>
+                SERVE IT
+              </span>
+              <span onClick={() => { setSt((s) => ({ ...s, raid: 0, raidCool: s.day + RAID_HOLD_COOL, modalGap: s.day + MODAL_GAP_SOFT })); setToast("\uD83D\uDCC4 The warrant stays in the drawer."); setSpeed("play"); }}
+                style={{ ...disp, fontSize: 13, cursor: "pointer", padding: "9px 13px", borderRadius: 10, border: `1px solid ${C.line}`, color: C.cream }}>
+                HOLD OFF
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* the debate */}
+      {show("debate") && (() => {
+        const ctx = challengerCtx(st.pop, d, calcHap(st.pop, d, st.mafia, st.crime), st);
+        const topics = debateTopics(ctx);
+        return <DebateModal topics={topics} smooth={(MAYORS[st.mayor] || {}).smooth} onFinish={(total) => {
+          setSt((s) => ({ ...s, approval: Math.min(100, Math.max(0, s.approval + total)),
+                           debate: 2, modalGap: s.day + MODAL_GAP }));
+          setToast(`\uD83C\uDF99\uFE0F The debate is over. ${total >= 0 ? "+" : ""}${total} approval.`);
+          setSpeed("play");
+        }} onSkip={() => {
+          setSt((s) => ({ ...s, debate: 2, modalGap: s.day + MODAL_GAP }));
+          setToast("\uD83C\uDF99\uFE0F You send your regrets. No stage tonight.");
+          setSpeed("play");
+        }} />;
+      })()}
 
       {/* the corrections contract */}
       {show("priv") && (
@@ -8135,7 +8540,7 @@ export default function Luckhead() {
             <div style={{ ...mono, fontSize: 10.5, color: C.amber, marginBottom: 10 }}>Vincent Tsui, informally</div>
             <div style={{ fontSize: 13, lineHeight: 1.55, color: C.dim }}>
               <p style={{ margin: "0 0 8px" }}>Now that Luckhead has a second factory, the Tsui family would like to run certain goods through it. Nothing you would need to see.</p>
-              <p style={{ margin: 0 }}>Every factory in town doubles its output. Crime rises sharply and permanently, and the arrangement ends only when the family does.</p>
+              <p style={{ margin: 0 }}>Any factory within {WAREHOUSE_REACH} tiles of their warehouse doubles its output. Crime rises sharply and permanently, and the arrangement ends only when the family does.</p>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <span
@@ -8148,10 +8553,14 @@ export default function Luckhead() {
               <span
                 onClick={() => {
                   setSt((s) => {
-                    const grid = s.grid.map((c) => (c && c.type === "factory" ? { ...c, smuggle: true } : c));
-                    return { ...s, grid, smuggleOffer: 3, crime: Math.min(100, s.crime + 12) };
+                    const wr = Math.floor(s.warehouse / SIZE), wc = s.warehouse % SIZE;
+                    const near = (i) => (s.warehouse || -1) >= 0
+                      && Math.abs(Math.floor(i / SIZE) - wr) + Math.abs((i % SIZE) - wc) <= WAREHOUSE_REACH;
+                    const grid = s.grid.map((c, i) => (c && c.type === "factory" && near(i) ? { ...c, smuggle: true } : c));
+                    const took = grid.filter((c) => c && c.smuggle).length;
+                    return { ...s, grid, smuggleOffer: 3, crime: Math.min(100, s.crime + (took ? 12 : 0)) };
                   });
-                  setToast("🏭 The night shift is not on any payroll. Output doubled.");
+                  setToast("🏭 The night shift is not on any payroll. Their trucks only go so far.");
                   setSpeed("play");
                 }}
                 style={{ ...disp, cursor: "pointer", fontSize: 12.5, background: C.amber, color: C.ink, borderRadius: 9, padding: "6px 12px" }}
@@ -8398,7 +8807,7 @@ export default function Luckhead() {
               ))}
               {L.mult !== 1 && (
                 <div style={{ display: "flex", justifyContent: "space-between", ...mono, fontSize: 10, padding: "2px 0", color: L.mult > 1 ? C.green : C.amber }}>
-                  <span>Difficulty ×{L.mult.toFixed(2)}</span><span>{L.base} → {L.total}</span>
+                  <span>Difficulty \u00d7{L.mult.toFixed(2)}{L.mutMult > 1 ? ` \u00b7 Twists \u00d7${L.mutMult.toFixed(2)}` : ""}</span><span>{L.base} \u2192 {L.total}</span>
                 </div>
               )}
               <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 6, paddingTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -8657,7 +9066,7 @@ export default function Luckhead() {
       })()}
 
       {crimeReport && (() => {
-        const rows = crimeLedgerRows({ mafia: st.mafia, reprisal: st.reprisal, testified: st.testified,
+        const rows = crimeLedgerRows({ whHot: (st.warehouse || -1) >= 0 && !st.whShut && (st.tsuiWar || 0) > 0, pandemic: (st.mutators || []).includes("pandemic"), mafia: st.mafia, reprisal: st.reprisal, testified: st.testified,
           rigged: st.rigged, pop: st.pop, backroom: st.backroom, fund: st.fund, heir: st.heir,
           event: st.event, gear: st.gear, day: st.day, bustUntil: st.bustUntil, chiefId: st.chiefId }, d);
         const net = rows.reduce((a, [, v]) => a + v, 0);
@@ -8781,14 +9190,17 @@ export default function Luckhead() {
                     setSt((s) => ({ ...s, lawyerId: k, lawyerFrom: s.day, money: s.money - fee }));
                     setNote(`${L.name} takes over for $${fee.toLocaleString()}. It will be ${LAWYER_HANDOVER} days before she is across the file.`);
                   }}
-                  style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 11, cursor: on ? "default" : "pointer",
+                  style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 11,
+                         cursor: on || (st.deadLawyers || []).includes(k) ? "default" : "pointer",
+                         opacity: (st.deadLawyers || []).includes(k) ? 0.45 : 1,
                          background: on ? C.bg : "transparent", border: `1px solid ${on ? C.orange : C.line}` }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                     <span style={{ fontSize: 13 }}>{L.icon}</span>
-                    <span style={{ ...disp, fontSize: 14, color: on ? C.orange : C.cream }}>{L.name}</span>
+                    <span style={{ ...disp, fontSize: 14, color: on ? C.orange : (st.deadLawyers || []).includes(k) ? C.dim : C.cream }}>{L.name}</span>
                     <span style={{ flex: 1 }} />
-                    <span style={{ ...mono, fontSize: 10, color: on ? C.amber : C.dim }}>
-                      ${L.fee}/day{!on && st.lawyerId ? ` \u00b7 $${(L.fee * LAWYER_SIGNING).toLocaleString()} to sign` : ""}
+                    <span style={{ ...mono, fontSize: 10, color: (st.deadLawyers || []).includes(k) ? C.red : on ? C.amber : C.dim }}>
+                      {(st.deadLawyers || []).includes(k) ? "KILLED \u00b7 Tsui reprisal"
+                        : `$${L.fee}/day${!on && st.lawyerId ? ` \u00b7 $${(L.fee * LAWYER_SIGNING).toLocaleString()} to sign` : ""}`}
                     </span>
                   </div>
                   {on && st.day < (st.lawyerFrom || 0) + LAWYER_HANDOVER && (
